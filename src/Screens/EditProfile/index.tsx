@@ -23,7 +23,7 @@ import {useUploadProgress} from '../../../services/UploadProgressManager';
 import {GlobalAlertManager} from '../../../components/Global/AlertModal';
 import {useTheme} from '../../../src/util/ThemeContext';
 import {Colors} from '../../../assets/color/Colors';
-import { checkProfanityAndAlert } from '../../util/profanityFilter';
+import {checkProfanityAndAlert} from '../../util/profanityFilter';
 
 async function requestCameraPermission() {
   if (Platform.OS !== 'android') return true;
@@ -61,16 +61,18 @@ export const EditProfile = () => {
   const palette = Colors[theme];
 
   // Date validation function
-  const validateDateOfBirth = (dateStr?: string): {isValid: boolean; error?: string} => {
+  const validateDateOfBirth = (
+    dateStr?: string,
+  ): {isValid: boolean; error?: string} => {
     if (!dateStr || dateStr === 'dd - MM - yyyy') {
       return {isValid: true}; // Empty date is allowed
     }
 
     // Convert display format back to check
     const cleanDate = dateStr.replace(/[\s-]/g, '');
-    
+
     if (cleanDate.length !== 10) {
-      console.log(cleanDate)
+      console.log(cleanDate);
       return {isValid: false, error: 'Ngày sinh không đầy đủ'};
     }
 
@@ -80,24 +82,28 @@ export const EditProfile = () => {
 
     // Basic validation
     if (day < 1 || day > 31) {
-      console.log(day)
+      console.log(day);
       return {isValid: false, error: 'Ngày không hợp lệ (01-31)'};
     }
 
     if (month < 1 || month > 12) {
-      console.log(month)
+      console.log(month);
       return {isValid: false, error: 'Tháng không hợp lệ (01-12)'};
     }
 
     const currentYear = new Date().getFullYear();
     if (year < 1900 || year > currentYear) {
-      console.log(year)
+      console.log(year);
       return {isValid: false, error: `Năm không hợp lệ (1900-${currentYear})`};
     }
 
     // Check if date exists
     const testDate = new Date(year, month - 1, day);
-    if (testDate.getDate() !== day || testDate.getMonth() !== month - 1 || testDate.getFullYear() !== year) {
+    if (
+      testDate.getDate() !== day ||
+      testDate.getMonth() !== month - 1 ||
+      testDate.getFullYear() !== year
+    ) {
       return {isValid: false, error: 'Ngày không tồn tại'};
     }
 
@@ -182,7 +188,10 @@ export const EditProfile = () => {
     // Validate required fields
     const requiredValidation = validateRequiredFields();
     if (!requiredValidation.isValid) {
-      GlobalAlertManager.show('Lỗi', requiredValidation.error || 'Vui lòng điền đầy đủ thông tin bắt buộc');
+      GlobalAlertManager.show(
+        'Lỗi',
+        requiredValidation.error || 'Vui lòng điền đầy đủ thông tin bắt buộc',
+      );
       return;
     }
     const profanityCheck = [username ?? '', bio ?? '', handleName ?? ''];
@@ -192,7 +201,10 @@ export const EditProfile = () => {
     // Validate date of birth
     const dateValidation = validateDateOfBirth(dateOfBirth);
     if (!dateValidation.isValid) {
-      GlobalAlertManager.show('Lỗi ngày sinh', dateValidation.error || 'Ngày sinh không hợp lệ');
+      GlobalAlertManager.show(
+        'Lỗi ngày sinh',
+        dateValidation.error || 'Ngày sinh không hợp lệ',
+      );
       return;
     }
 
@@ -268,7 +280,7 @@ export const EditProfile = () => {
                   label: 'Tên tài khoản *',
                   value: handleName,
                   onChangeText: setHandleName,
-                  editable: edit,
+                  editable: false,
                   type: 'text',
                 },
                 {
