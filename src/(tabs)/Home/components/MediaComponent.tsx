@@ -36,28 +36,6 @@ export const RenderMediaItem = React.memo(
       return 'contain';
     }, [videoSize]);
 
-    if (item.videoUrl) {
-      return (
-        <Video
-          source={{uri: item.videoUrl}}
-          resizeMode={videoResizeMode}
-          style={{width: screenWidth, height: 600}}
-          repeat
-          paused={!currentVisible || !isFocused}
-          muted={muted}
-          maxBitRate={0}
-          progressUpdateInterval={500}
-          onLoad={({naturalSize}) => {
-            setVideoSize({
-              width: naturalSize.width,
-              height: naturalSize.height,
-            });
-          }}
-          useTextureView={false}
-        />
-      );
-    }
-
     return (
       <View style={{width: screenWidth, height: item.videoUrl ? 600 : 520}}>
         {item.videoUrl ? (
@@ -86,7 +64,7 @@ export const RenderMediaItem = React.memo(
         )}
 
         {/* Hiển thị các tag (nếu có) */}
-        {item.tags?.map((tag, index) => (
+        {item.tags?.length > 0 && item.tags?.map((tag, index) => (
           <TagMarker
             key={`${tag.userId}_${index}`}
             tag={tag}

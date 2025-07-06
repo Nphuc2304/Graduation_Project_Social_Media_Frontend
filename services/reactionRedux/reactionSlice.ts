@@ -6,7 +6,7 @@ import {API} from '@services/api';
 export const likePost = createAsyncThunk(
   'reactions/likePost',
   async (
-    {postId, refreshToken, receiverId, handleName}: LikePostParams,
+    {postId, refreshToken, receiverId, handleName, userId}: LikePostParams,
     thunkAPI,
   ) => {
     try {
@@ -27,7 +27,7 @@ export const likePost = createAsyncThunk(
         },
       );
 
-      if (res.status >= 200 && res.status <= 300) {
+      if (res.status >= 200 && res.status <= 300 && userId !== receiverId) {
         await axiosInstance.post(
           API.NOTIFICATION_API,
           {
@@ -59,7 +59,7 @@ export const likePost = createAsyncThunk(
 export const unlikePost = createAsyncThunk(
   'reactions/unlikePost',
   async (
-    {postId, refreshToken, receiverId, handleName}: LikePostParams,
+    {postId, refreshToken, receiverId, handleName, userId}: LikePostParams,
     thunkAPI,
   ) => {
     try {
@@ -72,26 +72,6 @@ export const unlikePost = createAsyncThunk(
           Authorization: `Bearer ${refreshToken}`,
         },
       });
-
-      if (res.status >= 200 && res.status <= 300) {
-        await axiosInstance.post(
-          API.NOTIFICATION_API,
-          {
-            receiverIds: [receiverId],
-            title: `💔 ${handleName} đã bỏ thích bài viết của bạn`,
-            body: 'Có vẻ như cảm xúc đã thay đổi...',
-            data: {
-              type: 'unlike',
-              postId,
-            },
-          },
-          {
-            headers: {
-              token: 'refresh',
-            },
-          },
-        );
-      }
 
       return {postId};
     } catch (error: any) {

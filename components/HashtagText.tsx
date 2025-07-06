@@ -102,11 +102,12 @@ const HashtagText: React.FC<HashtagTextProps> = ({
           );
         } else if (tok.type === 'mention') {
           return (
-            <TouchableOpacity key={i} onPress={() => onPressMention(tok.text)}>
-              <Text style={{color: 'black', fontWeight: 'bold'}}>
-                {tok.text}
-              </Text>
-            </TouchableOpacity>
+            <Text
+              key={i} 
+              style={{color: hashtagColor, fontWeight: 'bold', fontSize: 14}}
+              onPress={() => onPressMention(tok.text)}>
+              {tok.text}
+            </Text>
           );
         } else {
           return (

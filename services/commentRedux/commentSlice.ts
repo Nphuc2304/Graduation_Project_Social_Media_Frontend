@@ -29,7 +29,7 @@ export const addComment = createAsyncThunk<
   { rejectValue: string }
 >(
   'comments/add',
-  async ({ payload, handleName, receiverId, postId }, { rejectWithValue, getState }) => {
+  async ({payload, handleName, receiverId, postId, userId}, { rejectWithValue, getState }) => {
     try {
       const res = await axiosInstance.post(API.ADD_COMMENT, payload, {
         headers: { token: 'refresh' },
@@ -58,7 +58,7 @@ export const addComment = createAsyncThunk<
         profilePic: currentUser?.profilePic,
       };
 
-      if (receiverId) {
+      if (response.status >= 200 && response.status <= 300 && userId !== receiverId) {
         await axiosInstance.post(
           API.NOTIFICATION_API,
           {
@@ -68,6 +68,7 @@ export const addComment = createAsyncThunk<
             data: {
               type: 'comment',
               postId,
+              commentId: response.data?.comment?._id,
             },
           },
           {

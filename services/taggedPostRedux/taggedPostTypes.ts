@@ -1,30 +1,18 @@
-export interface Tag {
-  userId: string;
-  handleName: string;
-  positionX: number;
-  positionY: number;
-  _id: string;
-}
-
-export interface Media {
-  _id: string;
-  postID: string;
-  imageUrl: string;
-  tags: Tag[];
-}
-
-export interface Owner {
-  _id: string;
-  handleName: string;
-  profilePic: string;
-}
-
+import { Music, MusicInfo, User } from '@services/bookmarkRedux/bookmarkTypes';
+import { Media } from '@services/postRedux/postTypes';
 export interface TaggedPost {
   _id: string;
-  owner: Owner;
+  user: User;
   caption: string;
+  type: string;
   media: Media[];
   share: number;
-  likeCounts: number;
-  commentCounts: number;
+  isLike: boolean;
+  isFollow: boolean;
+  isBookmarked: boolean;
+  music: Music;
+  musicInfo: MusicInfo;
+  likeCount: number;
+  commentCount: number;
+  createdAt: string;
 }

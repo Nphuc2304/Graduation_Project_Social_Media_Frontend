@@ -33,6 +33,7 @@
     "@zegocloud/zego-uikit-rn": "^2.17.1",
     "axios": "0.27.2",
     "buffer": "^6.0.3",
+    "dayjs": "^1.11.13",
     "expo-modules-core": "^2.3.12",
     "fast-text-encoding": "^1.0.6",
     "firebase": "^11.8.1",

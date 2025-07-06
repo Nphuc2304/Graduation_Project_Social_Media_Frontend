@@ -38,16 +38,20 @@ import {createRoom} from '../../../services/roomRedux/roomSlice';
 import {
   PostsView,
   ReelsView,
+  TagsView,
 } from '../../(tabs)/Profile/components/PostView.component';
 import {getPostsAndReelsOfUser} from '../../../services/postUserRedux/postUserSlice';
 import {clearPostsAndReels} from '../../../services/postUserRedux/postUserReducer';
+
 import {
   fetchHighlightStory,
   fetchStoryDetails,
 } from '../../../services/StoryRedux/StorySlice';
-import {GlobalAlertManager} from '../../../components/Global/AlertModal';
 import HighlightStories from '../../(tabs)/Profile/components/HighlightStories';
 import {handleHighlightPress} from '../../(tabs)/Home/util';
+import {GlobalAlertManager} from '../../../components/Global/AlertModal';
+import { fetchTaggedPosts } from '@services/taggedPostRedux/taggedPostSlice';
+
 
 const ProfileComp = ({route}: any) => {
   const navigation: any = useNavigation();
@@ -59,7 +63,6 @@ const ProfileComp = ({route}: any) => {
   const user = useSelector((state: RootState) => state.user.user);
 
   const [isInitializing, setIsInitializing] = useState(true);
-
   const prevUserRef = useRef<string | null>(null);
 
   const navigateToUserFollow = (initialTab: string = 'UserFollowersTab') => {
@@ -171,7 +174,11 @@ const ProfileComp = ({route}: any) => {
 
   const {isSuccess} = useSelector((state: RootState) => state.postUser);
   const {refreshToken} = useSelector((state: RootState) => state.user);
+
   const {highlightStories} = useSelector((state: RootState) => state.stories);
+
+  const profileTaggedPosts = useSelector((state: RootState) => state.taggedPosts.data);
+
 
   const initializeProfile = useCallback(async () => {
     if (!userID) {
@@ -188,13 +195,19 @@ const ProfileComp = ({route}: any) => {
       }
 
       // Fetch parallel
+
       const [profile, followersData, followingData, postData, highlightData] =
+
         await Promise.all([
           dispatch(getPublicProfile({userId: userID})).unwrap(),
           dispatch(fetchFollowers({userId: userID})).unwrap(),
           dispatch(fetchFollowing({userId: userID})).unwrap(),
           dispatch(getPostsAndReelsOfUser({refreshToken, userId: userID})),
+
           dispatch(fetchHighlightStory({userId: userID})),
+
+          dispatch(fetchTaggedPosts(userID)),
+
         ]);
 
       // Wait for profile first to set user states
@@ -251,6 +264,12 @@ const ProfileComp = ({route}: any) => {
       case 'reels':
         return isSuccess && ReelsItem ? (
           <ReelsView data={ReelsItem} />
+        ) : (
+          <LoadingPlaceholder />
+        );
+      case 'tagged':
+        return isSuccess && profileTaggedPosts ? (
+          <TagsView data={profileTaggedPosts} />
         ) : (
           <LoadingPlaceholder />
         );
@@ -400,18 +419,16 @@ const ProfileComp = ({route}: any) => {
           />
         )}
         {/* Posts Grid/Video Tabs */}
-        {/* {!isBlock && (
+        {!isBlock && (
           <>
-            <View style={{ flexDirection: 'row' }}>
+            <View style={{flexDirection: 'row'}}>
               <TouchableOpacity
-                disabled={!isPrivate}
                 onPress={() => {
                   setActiveTab('grid');
                 }}
                 style={[
                   styles.tab,
                   activeTab === 'grid' && styles.activeTab,
-                  !isPrivate && { opacity: 0.5 },
                 ]}>
                 <Grid
                   size={26}
@@ -423,14 +440,12 @@ const ProfileComp = ({route}: any) => {
                 />
               </TouchableOpacity>
               <TouchableOpacity
-                disabled={!isPrivate}
                 onPress={() => {
                   setActiveTab('reels');
                 }}
                 style={[
                   styles.tab,
                   activeTab === 'reels' && styles.activeTab,
-                  !isPrivate && { opacity: 0.5 },
                 ]}>
                 <Video
                   size={26}
@@ -442,14 +457,12 @@ const ProfileComp = ({route}: any) => {
                 />
               </TouchableOpacity>
               <TouchableOpacity
-                disabled={!isPrivate}
                 onPress={() => {
                   setActiveTab('tagged');
                 }}
                 style={[
                   styles.tab,
                   activeTab === 'tagged' && styles.activeTab,
-                  !isPrivate && { opacity: 0.5 },
                 ]}>
                 <UserSquare2
                   size={26}
@@ -463,7 +476,7 @@ const ProfileComp = ({route}: any) => {
             </View>
             {renderTabContent()}
           </>
-        )} */}
+        )}
         <Portal>
           <OptionModal
             ref={modalOptionRef}

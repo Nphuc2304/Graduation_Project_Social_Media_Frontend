@@ -1,21 +1,34 @@
-import {getNotification} from '@services/notificationRedux/notificationSlice';
-import {ItemNoti} from '@services/notificationRedux/notificationTypes';
-import {AppDispatch, RootState} from '@services/store';
-import React, {useCallback} from 'react';
+import React, {useCallback, useEffect} from 'react';
 import {
   SafeAreaView,
-  ScrollView,
+  FlatList,
   View,
   Text,
   TouchableOpacity,
   Image,
 } from 'react-native';
 import {useDispatch, useSelector} from 'react-redux';
-import {useNotificationStyles} from '../../../src/StyleSheet/NotificationStyles';
 import {ActivityIndicator} from 'react-native-paper';
-import {markMyUnreadAsRead, resetStatus} from '@services/notificationRedux/notificationReducer';
 import {useFocusEffect, useNavigation} from '@react-navigation/native';
-import { useTheme } from '../../../src/util/ThemeContext';
+import {AppDispatch, RootState, store} from '@services/store';
+import {
+  getNotification,
+  markAsReadNoti,
+} from '@services/notificationRedux/notificationSlice';
+import {
+  markAllAsRead,
+  resetStatus,
+  setIsReadNoti,
+} from '@services/notificationRedux/notificationReducer';
+import {ItemNoti} from '@services/notificationRedux/notificationTypes';
+import {useNotificationStyles} from '../../../src/StyleSheet/NotificationStyles';
+import {useTheme} from '../../../src/util/ThemeContext';
+import dayjs from 'dayjs';
+import relativeTime from 'dayjs/plugin/relativeTime';
+import 'dayjs/locale/vi';
+
+dayjs.extend(relativeTime);
+dayjs.locale('vi');
 
 const Header: React.FC<{onBackPress: () => void}> = ({onBackPress}) => {
   const styles = useNotificationStyles();
@@ -34,48 +47,56 @@ const Header: React.FC<{onBackPress: () => void}> = ({onBackPress}) => {
   );
 };
 
-// Nhóm và sắp xếp thông báo
-const groupNotificationsByDate = (notis: ItemNoti[]) => {
-  const groups: {[key: string]: ItemNoti[]} = {};
-
+// Group theo ngày, flatten thành danh sách có header
+const formatNotisWithHeaders = (notifications: ItemNoti[]) => {
   const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+
   const isSameDay = (a: Date, b: Date) =>
     a.getDate() === b.getDate() &&
     a.getMonth() === b.getMonth() &&
     a.getFullYear() === b.getFullYear();
 
-  notis.forEach(noti => {
+  const result: Array<{type: 'header' | 'item'; data: any}> = [];
+
+  const groups: {[key: string]: ItemNoti[]} = {};
+
+  notifications.forEach(noti => {
     const createdAt = new Date(noti.createdAt);
     let key = '';
-
-    if (isSameDay(createdAt, today)) {
-      key = 'Hôm nay';
-    } else {
-      const yesterday = new Date(today);
-      yesterday.setDate(today.getDate() - 1);
-      if (isSameDay(createdAt, yesterday)) {
-        key = 'Hôm qua';
-      } else {
-        const dd = createdAt.getDate().toString().padStart(2, '0');
-        const mm = (createdAt.getMonth() + 1).toString().padStart(2, '0');
-        const yyyy = createdAt.getFullYear();
-        key = `${dd}/${mm}/${yyyy}`;
-      }
-    }
+    if (isSameDay(createdAt, today)) key = 'Hôm nay';
+    else if (isSameDay(createdAt, yesterday)) key = 'Hôm qua';
+    else
+      key = `${createdAt.getDate().toString().padStart(2, '0')}/${(
+        createdAt.getMonth() + 1
+      )
+        .toString()
+        .padStart(2, '0')}/${createdAt.getFullYear()}`;
 
     if (!groups[key]) groups[key] = [];
     groups[key].push(noti);
   });
 
-  // Sắp xếp noti mới nhất trong mỗi nhóm
-  Object.keys(groups).forEach(k => {
-    groups[k].sort(
-      (a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  const sortedKeys = Object.keys(groups).sort((a, b) => {
+    if (a === 'Hôm nay') return -1;
+    if (b === 'Hôm nay') return 1;
+    if (a === 'Hôm qua') return -1;
+    if (b === 'Hôm qua') return 1;
+
+    const [d1, m1, y1] = a.split('/').map(Number);
+    const [d2, m2, y2] = b.split('/').map(Number);
+    return (
+      new Date(y2, m2 - 1, d2).getTime() - new Date(y1, m1 - 1, d1).getTime()
     );
   });
 
-  return groups;
+  sortedKeys.forEach(key => {
+    result.push({type: 'header', data: key});
+    groups[key].forEach(item => result.push({type: 'item', data: item}));
+  });
+
+  return result;
 };
 
 export const NotificationsScreen = () => {
@@ -83,55 +104,105 @@ export const NotificationsScreen = () => {
   const {theme} = useTheme();
   const navigation = useNavigation<any>();
   const dispatch = useDispatch<AppDispatch>();
-  const {notifications, isSuccess} = useSelector(
+
+  const {notifications, pagination, isLoadingMore, isSuccess} = useSelector(
     (state: RootState) => state.notification,
   );
-  const userId = useSelector((state: RootState) => state.user.user?._id);
 
   useFocusEffect(
     useCallback(() => {
-      // Khi vào màn hình
-      dispatch(getNotification({}));
+      dispatch(getNotification({page: 1}));
 
-      // Khi thoát màn hình
       return () => {
-        dispatch(markMyUnreadAsRead(userId));
+        const state: any = store.getState();
+        const unreadNotis = state.notification.notifications.filter(
+          (n: ItemNoti) => !n.isRead,
+        );
+        unreadNotis.forEach((n: ItemNoti) => {
+          dispatch(markAsReadNoti({id: n._id}));
+        });
+        dispatch(markAllAsRead());
+        dispatch(setIsReadNoti(false));
       };
     }, [dispatch]),
   );
 
+  const handleLoadMore = () => {
+    const currentPage = pagination?.page ?? 1;
+    const totalPages = pagination?.totalPages ?? 1;
+
+    if (currentPage < totalPages && !isLoadingMore) {
+      dispatch(getNotification({page: currentPage + 1}));
+    }
+  };
+
   const handlePress = (noti: ItemNoti) => {
-    console.log('Pressed Noti:', noti);
     const type = noti.data?.type;
     switch (type) {
       case 'comment':
         if (noti.data?.postId) {
-          navigation.navigate('PostDetailScreen', {postId: noti.data.postId});
+          navigation.navigate('PostDetailScreen', {
+            postId: noti.data?.postId,
+            commentId: noti.data?.commentId,
+          });
         }
         break;
       case 'like':
-        if (noti.data?.postId) {
-          navigation.navigate('PostDetailScreen', {postId: noti.data.postId});
-        }
-        break;
       case 'unlike':
+      case 'post':
         if (noti.data?.postId) {
-          navigation.navigate('PostDetailScreen', {postId: noti.data.postId});
+          navigation.navigate('PostDetailScreen', {
+            postId: noti.data?.postId,
+          });
         }
         break;
       case 'follow':
         navigation.navigate('ProfileComp', {userID: noti.data?.userId});
         break;
-      case 'post':
-        if (noti.data?.postId) {
-          navigation.navigate('PostDetailScreen', {postId: noti.data.postId});
-        }
-        break;
-      case 'story':
-        break;
-      default:
+      case 'message':
+        navigation.navigate('MessageScreen', {
+          room: noti.data?.roomId,
+          // isWaiting: noti.data?.isWaiting,
+        });
         break;
     }
+  };
+
+  const renderItem = ({item}: {item: {type: 'header' | 'item'; data: any}}) => {
+    if (item.type === 'header') {
+      return <Text style={styles.sectionTitle}>{item.data}</Text>;
+    }
+
+    const noti: ItemNoti = item.data;
+    const isRead = noti.isRead ?? false;
+
+    return (
+      <TouchableOpacity
+        key={noti._id}
+        style={[
+          styles.notificationItem,
+          !isRead && {
+            backgroundColor:
+              theme === 'light'
+                ? 'rgba(238, 246, 255, 1)'
+                : 'rgba(255, 255, 255, 0.1)',
+          },
+        ]}
+        onPress={() => handlePress(noti)}>
+        <Image style={styles.avatar} source={{uri: noti.sender.profilePic}} />
+        <View style={styles.textContainer}>
+          <Text
+            style={[styles.contentText, !isRead && {fontWeight: 'bold'}]}
+            numberOfLines={2}>
+            {noti.title}
+          </Text>
+          <Text style={styles.bodyText} numberOfLines={1}>
+            {noti.body}
+          </Text>
+          <Text style={styles.bodyText}>{dayjs(noti.createdAt).fromNow()}</Text>
+        </View>
+      </TouchableOpacity>
+    );
   };
 
   return (
@@ -139,7 +210,7 @@ export const NotificationsScreen = () => {
       <Header
         onBackPress={() => {
           navigation.goBack();
-          dispatch(resetStatus()); // hoặc resetNotifications nếu có
+          dispatch(resetStatus());
         }}
       />
 
@@ -152,72 +223,24 @@ export const NotificationsScreen = () => {
           <Text style={styles.emptyText}>Bạn không có thông báo nào</Text>
         </View>
       ) : (
-        (() => {
-          const grouped = groupNotificationsByDate(notifications);
-          const sections = Object.keys(grouped).sort((a, b) => {
-            if (a === 'Hôm nay') return -1;
-            if (b === 'Hôm nay') return 1;
-            if (a === 'Hôm qua') return -1;
-            if (b === 'Hôm qua') return 1;
-
-            const [dayA, monthA, yearA] = a.split('/').map(Number);
-            const [dayB, monthB, yearB] = b.split('/').map(Number);
-            const dateA = new Date(yearA, monthA - 1, dayA);
-            const dateB = new Date(yearB, monthB - 1, dayB);
-
-            return dateB.getTime() - dateA.getTime();
-          });
-
-          return (
-            <ScrollView
-              style={styles.scrollView}
-              contentContainerStyle={{paddingBottom: 16}}>
-              {sections.map(section => (
-                <View key={section}>
-                  <Text style={styles.sectionTitle}>{section}</Text>
-                  {grouped[section].map(item => {
-                    const receiverInfo = item.receiver.find(
-                      r => r.userId === userId,
-                    );
-                    const isRead = receiverInfo?.isRead ?? false;
-
-                    return (
-                      <TouchableOpacity
-                        key={item._id}
-                        style={[
-                          styles.notificationItem,
-                          !isRead && {backgroundColor: theme === 'light' ? 'rgba(238, 246, 255, 1)' : 'rgba(255, 255, 255, 0.1)'},
-                        ]}
-                        onPress={() => handlePress(item)}>
-                        <Image
-                          style={styles.avatar}
-                          source={require('../../../assets/icon/account.png')}
-                        />
-                        <View style={styles.textContainer}>
-                          <Text
-                            style={[
-                              styles.contentText,
-                              !isRead && {fontWeight: 'bold'},
-                            ]}
-                            numberOfLines={2}
-                            ellipsizeMode="tail">
-                            {item.title}
-                          </Text>
-                          <Text
-                            style={styles.bodyText}
-                            numberOfLines={1}
-                            ellipsizeMode="tail">
-                            {item.body}
-                          </Text>
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              ))}
-            </ScrollView>
-          );
-        })()
+        <View style={styles.container}>
+          <FlatList
+            data={formatNotisWithHeaders(notifications)}
+            horizontal={false}
+            renderItem={renderItem}
+            keyExtractor={(item, index) =>
+              item.type === 'header' ? `header-${item.data}` : item.data._id
+            }
+            onEndReached={handleLoadMore}
+            onEndReachedThreshold={0.5}
+            contentContainerStyle={{paddingBottom: 16}}
+            ListFooterComponent={
+              isLoadingMore ? (
+                <ActivityIndicator size="small" color="#888" />
+              ) : null
+            }
+          />
+        </View>
       )}
     </SafeAreaView>
   );

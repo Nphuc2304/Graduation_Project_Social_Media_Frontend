@@ -16,25 +16,29 @@ import {Buffer} from 'buffer';
 import {TabLoadingProvider} from '../services/TabLoadingContext';
 import {SocketProvider} from '../services/SocketContext';
 import {KeyboardAvoidingView} from 'react-native';
-import {useNotificationHandler} from '@services/notification/useNotification';
-import NotificationModal from '@services/notification/NotificationModal';
 import {navigationRef} from './NavigationService';
 import {
   GlobalAlert,
   GlobalAlertManager,
   GlobalAlertRef,
 } from '../components/Global/AlertModal';
+import NotificationModal from '@services/notification/NotificationModal';
 import {createNotificationChannel} from '@services/notification/notification';
+import {useNotificationHandler} from '@services/notification/useNotification';
 import {LogBox} from 'react-native';
+
 LogBox.ignoreLogs(['Warning: componentWillReceiveProps has been renamed']);
 
 global.Buffer = Buffer;
+
 if (__DEV__) {
   import('./config/ReactotronConfig').then(() =>
     console.tron.log('Reactotron Configured ✅'),
   );
 }
+
 enableScreens();
+
 
 const App = () => {
   useEffect(() => {
@@ -58,6 +62,7 @@ const App = () => {
         });
         break;
       case 'message':
+
         navigationRef.navigate('MessageScreen', {
           room: data?.roomId,
           isWaiting: data?.isWaiting,
@@ -75,6 +80,54 @@ const App = () => {
   };
 
   return (
+    <>
+      <AppNavigator />
+      <Toast />
+      {modalData && (
+        <NotificationModal
+          visible={true}
+          title={modalData.title}
+          body={modalData.body}
+          onClose={clearModal}
+          onAction={() => {
+            clearModal();
+            if (modalData.data) {
+              switch (modalData.data.type) {
+                case 'post':
+                  navigationRef.navigate('PostDetail', {
+                    postId: modalData.data.id,
+                  });
+                  break;
+                case 'call':
+                  navigationRef.navigate('ZegoCallScreen', {
+                    callID: modalData.data.callId,
+                    userID: modalData.data.userId,
+                    userName: modalData.data.userName,
+                    image: modalData.data.image,
+                    isCaller: false,
+                  });
+                  break;
+                case 'message':
+                  navigationRef.navigate('MessageScreen', {
+                    roomId: modalData.data.roomId,
+                  });
+                  break;
+              }
+            }
+          }}
+        />
+      )}
+      <GlobalAlert ref={handleAlertRef} />
+    </>
+  );
+};
+
+const App = () => {
+  useEffect(() => {
+    createNotificationChannel();
+  }, []);
+
+  return (
     <GestureHandlerRootView style={{flex: 1}}>
       <Provider store={store}>
         <PersistGate loading={null} persistor={persistor}>
@@ -85,44 +138,7 @@ const App = () => {
                   <Host>
                     <UploadProvider>
                       <TabLoadingProvider>
-                        <AppNavigator />
-                        <Toast />
-
-                        {modalData && (
-                          <NotificationModal
-                            visible={true}
-                            title={modalData.title}
-                            body={modalData.body}
-                            onClose={clearModal}
-                            onAction={() => {
-                              clearModal();
-                              if (modalData.data) {
-                                switch (modalData.data.type) {
-                                  case 'post':
-                                    navigationRef.navigate('PostDetail', {
-                                      postId: modalData.data.id,
-                                    });
-                                    break;
-                                  case 'call':
-                                    navigationRef.navigate('ZegoCallScreen', {
-                                      callID: modalData.data.callId,
-                                      userID: modalData.data.userId,
-                                      userName: modalData.data.userName,
-                                      image: modalData.data.image,
-                                      isCaller: false,
-                                    });
-                                    break;
-                                  case 'message':
-                                    navigationRef.navigate('MessageScreen', {
-                                      roomId: modalData.data.roomId,
-                                    });
-                                    break;
-                                }
-                              }
-                            }}
-                          />
-                        )}
-                        <GlobalAlert ref={handleAlertRef} />
+                        <AppContent />
                       </TabLoadingProvider>
                     </UploadProvider>
                   </Host>

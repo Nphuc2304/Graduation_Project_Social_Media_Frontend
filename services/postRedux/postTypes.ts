@@ -3,7 +3,7 @@ export interface Media {
   postID: string;
   imageUrl?: string;
   videoUrl: string;
-  tags?: Tags[];
+  tags: Tags[];
 }
 
 export interface Tags {

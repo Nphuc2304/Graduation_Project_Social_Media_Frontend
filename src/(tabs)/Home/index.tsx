@@ -265,8 +265,8 @@ export const Home = forwardRef(({onReload, route}: any, ref) => {
   }, [dispatch, isLoadingMore, hasNextPage, page, hasCalledLoadMore]);
 
   useEffect(() => {
-    dispatch(getNotification({}));
-  }, []);
+    dispatch(getNotification({page: 1}));
+  }, [dispatch]);
 
   const prefetchNextPage = useCallback(() => {
     if (!isLoadingMore && hasNextPage && !hasCalledLoadMore) {

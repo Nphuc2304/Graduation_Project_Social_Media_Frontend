@@ -51,6 +51,7 @@ export const useItemHomeActions = (
         refreshToken,
         receiverId: user._id,
         handleName: handleName,
+        userId: userID
       }),
     ).unwrap();
 

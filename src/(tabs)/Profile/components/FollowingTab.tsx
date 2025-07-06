@@ -6,9 +6,11 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
+  Alert,
+
 } from 'react-native';
 import {FlashList} from '@shopify/flash-list';
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useMemo} from 'react';
 import {Colors} from '../../../../assets/color/Colors';
 import {useTheme} from '../../../util/ThemeContext';
 import {useNavigation} from '@react-navigation/native';
@@ -21,6 +23,8 @@ import {
 } from '../../../../services/relationRedux/relationSlice';
 import {createRoom} from '../../../../services/roomRedux/roomSlice';
 import {GlobalAlertManager} from '../../../../components/Global/AlertModal';
+import { MoreActionModal } from './MoreActionModal';
+import { UserProfile } from '@services/relationRedux/relationTypes';
 
 const FollowingTab = () => {
   const navigation: any = useNavigation();
@@ -31,38 +35,31 @@ const FollowingTab = () => {
   const dispatch = useDispatch<AppDispatch>();
   const {
     following: reduxFollowing,
-    recommendations: reduxRecommendatinos,
+    recommendations: reduxRecommendations,
     loading,
     error,
   } = useSelector((state: RootState) => state.relation);
 
-  const [following, setFollowing] = useState(reduxFollowing);
-  const [recommendations, setRecommendations] = useState(reduxRecommendatinos);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [isError, setIsError] = useState<string | null>(null);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
 
   useEffect(() => {
     if (!userID) return;
-
-    setIsLoading(true);
-    setIsError(null);
-
-    Promise.all([
-      dispatch(fetchFollowing({userId: userID})).unwrap(),
-      dispatch(fetchRecommendations({limit: 10})).unwrap(),
-    ])
-      .then(([followData, recData]) => {
-        setFollowing(followData);
-        setRecommendations(recData);
-      })
-      .catch(err => {
-        console.error('Error loading lists:', err);
-        setIsError(typeof err === 'string' ? err : 'Tải dữ liệu thất bại');
-      })
-      .finally(() => setIsLoading(false));
+    dispatch(fetchFollowing({ userId: userID }));
+    dispatch(fetchRecommendations({ limit: 10 }));
   }, [dispatch, userID]);
 
-  const handleMessagingPress = async (item: (typeof following)[0]) => {
+  const followingIds = useMemo(
+    () => new Set(reduxFollowing.map(u => u._id)),
+    [reduxFollowing]
+  );
+
+  const recommendations = useMemo(
+    () => reduxRecommendations.filter(u => !followingIds.has(u._id)),
+    [reduxRecommendations, followingIds]
+  );
+
+  const handleMessagingPress = async (item: UserProfile) => {
     try {
       const res = await dispatch(
         createRoom({
@@ -90,7 +87,7 @@ const FollowingTab = () => {
     }
   };
 
-  const handleFollowPress = async (item: (typeof recommendations)[0]) => {
+  const handleFollowPress = async (item: UserProfile) => {
     try {
       await dispatch(
         relationAction({
@@ -100,12 +97,35 @@ const FollowingTab = () => {
           handleName: user?.handleName,
         }),
       ).unwrap();
-
-      setRecommendations(curr => curr.filter(u => u._id !== item._id));
     } catch (error) {
       GlobalAlertManager.show('Thất bại', 'Vui lòng thử lại sau');
       console.log(error);
     }
+  };
+
+  const handleMorePress = (item: UserProfile) => {
+    setSelectedUser(item);
+    setModalVisible(true);
+  };
+
+  const onUnfollow = async () => {
+    if (!selectedUser) return;
+    try {
+      await dispatch(
+        relationAction({
+          targetId: selectedUser._id,
+          action: 'unfollow',
+          senderId: user?._id!,
+          handleName: user?.handleName!,
+        })
+      ).unwrap();
+    } catch (err) {
+      GlobalAlertManager.show('Lỗi', 'Không thể bỏ theo dõi. Vui lòng thử lại.');
+    }
+  };
+
+  const onReport = () => {
+    GlobalAlertManager.show('Thông báo', 'Đã báo cáo');
   };
 
   const renderCategoryItem = ({item}: {item: any}) => (
@@ -126,7 +146,7 @@ const FollowingTab = () => {
     </TouchableOpacity>
   );
 
-  const renderSortItem = ({item}: {item: (typeof following)[0]}) => (
+  const renderSortItem = ({item}: {item: UserProfile}) => (
     <View style={[styles.suggestedItem, {backgroundColor: color.background}]}>
       <TouchableOpacity style={styles.touchableInfo}>
         <Image source={{uri: item.profilePic}} style={styles.profilePic} />
@@ -144,7 +164,7 @@ const FollowingTab = () => {
         style={[styles.messageButton, {borderColor: color.text}]}>
         <Text style={[styles.messageText, {color: color.text}]}>Nhắn tin</Text>
       </TouchableOpacity>
-      <TouchableOpacity>
+      <TouchableOpacity onPress={() => handleMorePress(item)}>
         <Image
           source={require('../../../../assets/icon/menu-dots-vertical.png')}
           style={[styles.moreIcon, {tintColor: color.text}]}
@@ -153,7 +173,7 @@ const FollowingTab = () => {
     </View>
   );
 
-  const renderRecommendItem = ({item}: {item: (typeof recommendations)[0]}) => (
+  const renderRecommendItem = ({item}: {item: UserProfile}) => (
     <View style={[styles.suggestedItem, {backgroundColor: color.background}]}>
       <TouchableOpacity style={styles.touchableInfo}>
         <Image source={{uri: item.profilePic}} style={styles.profilePic} />
@@ -171,19 +191,13 @@ const FollowingTab = () => {
         style={styles.followButton}>
         <Text style={styles.followText}>Theo dõi</Text>
       </TouchableOpacity>
-      <TouchableOpacity>
-        <Image
-          source={require('../../../../assets/icon/menu-dots-vertical.png')}
-          style={[styles.moreIcon, {tintColor: color.text}]}
-        />
-      </TouchableOpacity>
     </View>
   );
 
-  if (isLoading) {
-    return <ActivityIndicator style={{marginTop: 20}} size="large" />;
+  if (loading) {
+    return <ActivityIndicator style={{marginTop: 20}} size="large" color={color.primary}/>;
   }
-  if (isError) {
+  if (error) {
     return (
       <View style={{padding: 20}}>
         <Text style={{color: color.text, textAlign: 'center'}}>{error}</Text>
@@ -193,7 +207,7 @@ const FollowingTab = () => {
 
   return (
     <ScrollView style={[styles.container, {backgroundColor: color.background}]}>
-      {!isLoading && following.length === 0 ? (
+      {reduxFollowing.length === 0 ? (
         <View
           style={{
             backgroundColor: color.background,
@@ -228,7 +242,7 @@ const FollowingTab = () => {
         </View>
       ) : (
         <FlashList
-          data={following}
+          data={reduxFollowing}
           keyExtractor={item => item._id}
           renderItem={renderSortItem}
           showsVerticalScrollIndicator={false}
@@ -246,6 +260,12 @@ const FollowingTab = () => {
             Gợi ý cho bạn
           </Text>
         }
+      />
+      <MoreActionModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        onUnfollow={onUnfollow}
+        onReport={onReport}
       />
     </ScrollView>
   );

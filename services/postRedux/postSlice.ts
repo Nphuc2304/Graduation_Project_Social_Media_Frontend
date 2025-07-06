@@ -1,5 +1,5 @@
 import {createAsyncThunk} from '@reduxjs/toolkit';
-import {PostWithMedia, UploadPostPayload, Pagination} from './postTypes';
+import {PostWithMedia, UploadPostPayload, Pagination, Media} from './postTypes';
 import axiosInstance from '../axiosInstance';
 import {API} from '../api';
 
@@ -61,7 +61,11 @@ export const uploadPostWithMedia = createAsyncThunk<
       },
     });
 
-    if (response.status >= 200 && response.status <= 300) {
+    const post = response.data?.post;
+    const postId = post?._id;
+
+    if (response.status >= 200 && response.status <= 300 && postId) {
+      // Gửi thông báo cho follower (bạn đã có sẵn)
       await axiosInstance.post(
         API.NOTIFICATION_API_FOLLOW,
         {
@@ -69,7 +73,7 @@ export const uploadPostWithMedia = createAsyncThunk<
           body: `Người dùng ${handleName} vừa đăng một bài viết mới.`,
           data: {
             type: 'post',
-            postId: response.data?.post?._id,
+            postId,
           },
         },
         {
@@ -78,13 +82,46 @@ export const uploadPostWithMedia = createAsyncThunk<
           },
         },
       );
+
+      // ✅ Lấy danh sách userId được tag từ tất cả media
+      const taggedUserIds = new Set<string>();
+
+      post.media?.forEach((mediaItem: Media) => {
+        mediaItem.tags?.forEach(tag => {
+          if (tag?.userId) {
+            taggedUserIds.add(tag.userId);
+          }
+        });
+      });
+
+      // ✅ Gửi noti cho từng user được tag
+      for (const userId of taggedUserIds) {
+        await axiosInstance.post(
+          API.NOTIFICATION_API,
+          {
+            receiverId: [userId],
+            title: `Bạn được gắn thẻ trong bài viết`,
+            body: `Người dùng ${handleName} đã tag bạn trong một bài viết.`,
+            data: {
+              type: 'tagged',
+              postId,
+            },
+          },
+          {
+            headers: {
+              token: 'refresh',
+            },
+          },
+        );
+      }
     }
 
-    return response.data;
+    return post;
   } catch (err: any) {
     return rejectWithValue(err.response?.data || err.message);
   }
 });
+
 
 export const hidePost = createAsyncThunk<
   {message: string},

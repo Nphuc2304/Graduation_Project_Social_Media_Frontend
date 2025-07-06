@@ -1,6 +1,6 @@
 import {createSlice} from '@reduxjs/toolkit';
 import {UserProfile, RelationWithUser} from './relationTypes';
-import {fetchFollowers, fetchFollowing, fetchBlocking, fetchRecommendations} from './relationSlice';
+import {fetchFollowers, fetchFollowing, fetchBlocking, fetchRecommendations, relationAction} from './relationSlice';
 
 interface RelationState {
   followers: UserProfile[];
@@ -97,6 +97,19 @@ const relationReducer = createSlice({
       .addCase(fetchRecommendations.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload || 'Tải dữ liệu gợi ý thất bại';
+      })
+      //relationAction
+      .addCase(relationAction.fulfilled, (state, { meta, payload }) => {
+        const { action, targetId } = meta.arg;
+        if (action === 'follow') {
+          const u = state.followers.find(u => u._id === targetId);
+          if (u) {
+            state.following.unshift(u);
+          }
+        } 
+        if (action === 'unfollow') {
+          state.following = state.following.filter(u => u._id !== targetId);
+        }
       });
   },
 });

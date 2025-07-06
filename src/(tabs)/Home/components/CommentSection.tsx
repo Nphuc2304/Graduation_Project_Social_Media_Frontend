@@ -89,7 +89,7 @@ const BottomSheetComment = forwardRef<BottomSheetCommentRef, Props>(
             handleName: user?.handleName,
             postId: postId,
             receiverId: receiverId,
-          }),
+            userId: user?._id}),
         ).unwrap();
 
         dispatch(incrementCommentCountByPostId(postId));

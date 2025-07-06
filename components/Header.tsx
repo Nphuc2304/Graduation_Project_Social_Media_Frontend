@@ -13,6 +13,7 @@ import {Menu, Divider, Provider} from 'react-native-paper';
 import {GlobalAlertManager} from './Global/AlertModal';
 import {useSelector} from 'react-redux';
 import {RootState} from '@services/store';
+import { getUnreadNotificationCount } from '@services/notificationRedux/notificationSlice';
 
 const Header = (props: any) => {
   const {
@@ -39,16 +40,11 @@ const Header = (props: any) => {
   const openMenu = () => setVisible(true);
   const closeMenu = () => setVisible(false);
 
+  const isReadNoti = useSelector((state: RootState) => state.notification.isReadNoti);
+
   const unreadCount = useSelector((state: RootState) => {
     const notifications = state.notification.notifications;
-    const userId = state.user.user?._id;
-
-    if (!userId) return 0;
-
-    return notifications.reduce((count, noti) => {
-      const receiver = noti.receiver.find(r => r.userId === userId);
-      return receiver && !receiver.isRead ? count + 1 : count;
-    }, 0);
+    return getUnreadNotificationCount(notifications);
   });
 
   return (
@@ -139,7 +135,7 @@ const Header = (props: any) => {
                 source={iconNotify}
                 style={[styles.icon, {tintColor: color.text}]}
               />
-              {unreadCount > 0 && (
+              {unreadCount > 0 || isReadNoti && (
                 <View style={[styles.badge, {backgroundColor: color.primary}]}/>
               )}
             </TouchableOpacity>

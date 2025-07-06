@@ -5,17 +5,26 @@ export interface Receiver {
 
 export interface ItemNoti {
     _id: string;
-    receiver: Receiver[];
-    senderId: string;
     title: string;
     body: string;
     data: any;
     createdAt: string;
-    updatedAt: string;
     isRead: boolean;
+    sender: {
+        _id: string;
+        username: string;
+        handleName: string;
+        profilePic: string;
+    };
 }
 
 export interface ResNoti {
     success: boolean;
-    notifications: ItemNoti[];
+    data: ItemNoti[];
+    pagination: {
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+    };
 }

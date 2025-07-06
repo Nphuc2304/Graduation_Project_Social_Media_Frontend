@@ -1,6 +1,9 @@
 import {
   Image,
+  KeyboardAvoidingView,
+  Platform,
   SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -8,19 +11,18 @@ import {
 } from 'react-native';
 import {useRoute, useNavigation, useIsFocused} from '@react-navigation/native';
 import {useEffect, useRef, useState} from 'react';
-import BottomSheetComment, {
+import {
   BottomSheetCommentRef,
 } from '../src/(tabs)/Home/components/CommentSection';
 import ItemHome from '../src/(tabs)/Home/components/ItemHome';
 import {useTheme} from '../src/util/ThemeContext';
 import {Colors} from '../assets/color/Colors';
-import {fetchCommentsByPost} from '../services/commentRedux/commentSlice';
-import {useDispatch} from 'react-redux';
-import {AppDispatch} from '../services/store';
 import axiosInstance from '@services/axiosInstance';
+import CommentSection from './CommentSection';
 
 interface RouteParams {
   postId: string;
+  commentId?: string;
 }
 
 const PostDetailScreen = () => {
@@ -29,9 +31,8 @@ const PostDetailScreen = () => {
   const {theme} = useTheme();
   const colors = Colors[theme];
   const isFocused = useIsFocused();
-  const dispatch = useDispatch<AppDispatch>();
 
-  const {postId} = route.params as RouteParams;
+  const {postId, commentId} = route.params as RouteParams;
 
   const sheetRef = useRef<BottomSheetCommentRef>(null);
   const [post, setPost] = useState<any | null>(null);
@@ -52,7 +53,6 @@ const PostDetailScreen = () => {
             },
           },
         );
-        console.log('data: ', data.data);
         setPost(data.data);
       } catch (error) {
         console.log('Lỗi lấy post:', error);
@@ -61,12 +61,6 @@ const PostDetailScreen = () => {
 
     fetchPostById();
   }, [postId]);
-
-  const onOpenComment = (postId: string, receiverId: string) => {
-    setSelectedPostId({postId, receiverId});
-    dispatch(fetchCommentsByPost(postId));
-    sheetRef.current?.open();
-  };
 
   if (!post) {
     return (
@@ -77,7 +71,12 @@ const PostDetailScreen = () => {
   }
 
   return (
-    <SafeAreaView style={{flex: 1}}>
+  <SafeAreaView style={{flex: 1, backgroundColor: colors.background}}>
+    <KeyboardAvoidingView
+      style={{flex: 1}}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}>
+      
       <View style={[styles.header, {backgroundColor: colors.background}]}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Image
@@ -89,7 +88,9 @@ const PostDetailScreen = () => {
         <View style={styles.iconBack} />
       </View>
 
-      <View style={{flex: 1, backgroundColor: colors.background}}>
+      <ScrollView
+        keyboardShouldPersistTaps="handled">
+        
         <ItemHome
           _id={post._id}
           type={post.type}
@@ -109,14 +110,16 @@ const PostDetailScreen = () => {
           isFollow={post.isFollow}
           setSelectedPostId={setSelectedPostId}
         />
-        <BottomSheetComment
-          ref={sheetRef}
-          postId={selectedPostId.postId}
-          receiverId={selectedPostId.receiverId}
+
+        <CommentSection
+          postId={post._id}
+          receiverId={post.user?._id}
         />
-      </View>
-    </SafeAreaView>
-  );
+      </ScrollView>
+    </KeyboardAvoidingView>
+  </SafeAreaView>
+);
+
 };
 
 export default PostDetailScreen;

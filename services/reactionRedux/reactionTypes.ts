@@ -8,4 +8,5 @@ export interface LikePostParams {
   refreshToken: string;
   receiverId: string;
   handleName: string;
+  userId?: string;
 }
