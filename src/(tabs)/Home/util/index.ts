@@ -130,7 +130,7 @@ export const handleUserPress = async (
   }
 
   try {
-    // ✅ Check cache first
+    // Check cache first
     const cachedData = getCachedStoryData?.(item._id);
     let basicStoryData;
 
@@ -141,11 +141,11 @@ export const handleUserPress = async (
       // Fallback to existing stories or create skeleton
       basicStoryData = item.stories.map((storyId: string) => {
         const existingStory = storyDetails.find(s => s._id === storyId);
-        return existingStory || { _id: storyId, isLoading: true };
+        return existingStory || {_id: storyId, isLoading: true};
       });
     }
 
-    // ✅ Create initial storyGroups - giữ nguyên thứ tự gốc
+    //  Create initial storyGroups - giữ nguyên thứ tự gốc
     const createInitialStoryGroups = () => {
       const allUsersWithStories = [user, ...followingUsers].filter(
         u => u.stories?.length > 0,
@@ -154,16 +154,16 @@ export const handleUserPress = async (
       // ✅ Giữ nguyên original order từ followingUsers (như trên UI Home)
       const originalOrder = [
         // 1. Current user đầu tiên (như UI Home)
-        ...allUsersWithStories.filter(u => 
-          u._id === user?._id || u.handleName === user?.handleName
+        ...allUsersWithStories.filter(
+          u => u._id === user?._id || u.handleName === user?.handleName,
         ),
         // 2. Các users khác theo thứ tự trong followingUsers
-        ...allUsersWithStories.filter(u => 
-          u._id !== user?._id && u.handleName !== user?.handleName
-        )
+        ...allUsersWithStories.filter(
+          u => u._id !== user?._id && u.handleName !== user?.handleName,
+        ),
       ];
 
-      // ✅ Không thay đổi thứ tự, giữ nguyên originalOrder
+      // Không thay đổi thứ tự, giữ nguyên originalOrder
       return originalOrder.map(u => ({
         creator: {
           username: u.handleName,
@@ -172,21 +172,25 @@ export const handleUserPress = async (
         },
         stories: u.stories.map((storyId: string) => {
           const existingStory = storyDetails.find(s => s._id === storyId);
-          return existingStory || { _id: storyId, isLoading: true };
+          return existingStory || {_id: storyId, isLoading: true};
         }),
       }));
     };
 
     const initialStoryGroups = createInitialStoryGroups();
     const initialGroupIndex = initialStoryGroups.findIndex(
-      g => g.creator.username === item.handleName
+      g => g.creator.username === item.handleName,
     );
 
-    debugStoryGroups(initialStoryGroups, initialGroupIndex, 'Story Groups (Original Order)');
+    debugStoryGroups(
+      initialStoryGroups,
+      initialGroupIndex,
+      'Story Groups (Original Order)',
+    );
 
-    // ✅ Navigate immediately với complete storyGroups structure
+    // Navigate immediately với complete storyGroups structure
     const hasRealData = cachedData && cachedData.length > 0;
-    
+
     navigation.navigate(isCurrentUser ? 'SeenStoryOwner' : 'SeenStory', {
       stories: basicStoryData,
       creator: {
@@ -194,18 +198,18 @@ export const handleUserPress = async (
         profilePic: item.profilePic,
         _id: item._id,
       },
-             storyGroups: initialStoryGroups,
-       storyGroupIndex: Math.max(0, initialGroupIndex),
+      storyGroups: initialStoryGroups,
+      storyGroupIndex: Math.max(0, initialGroupIndex),
       isLoading: !hasRealData, // Only show loading if no cached data
     });
 
-    // ✅ If we already have cached data, no need to load again
+    // If we already have cached data, no need to load again
     if (hasRealData) {
       setIsStoryLoading?.(false);
       return;
     }
 
-    // ✅ Load real data trong background nếu chưa có cache, maintain original order
+    // Load real data trong background nếu chưa có cache, maintain original order
     const loadRealStoryData = async (usersList: any[]) => {
       const storyGroupsWithData = await Promise.all(
         usersList.map(async u => {
@@ -283,21 +287,21 @@ export const handleUserPress = async (
       return storyGroupsWithData.filter(group => group.stories.length > 0);
     };
 
-    // ✅ Maintain same ordering as initial groups - giữ nguyên thứ tự gốc
+    // Maintain same ordering as initial groups - giữ nguyên thứ tự gốc
     const allUsersWithStories = [user, ...followingUsers].filter(
       u => u.stories?.length > 0,
     );
 
-    // ✅ Giữ nguyên original order, không thay đổi thứ tự
+    // Giữ nguyên original order, không thay đổi thứ tự
     const sortedUsersWithStories = [
       // 1. Current user đầu tiên (như UI Home)
-      ...allUsersWithStories.filter(u => 
-        u._id === user?._id || u.handleName === user?.handleName
+      ...allUsersWithStories.filter(
+        u => u._id === user?._id || u.handleName === user?.handleName,
       ),
       // 2. Các users khác theo thứ tự trong followingUsers
-      ...allUsersWithStories.filter(u => 
-        u._id !== user?._id && u.handleName !== user?.handleName
-      )
+      ...allUsersWithStories.filter(
+        u => u._id !== user?._id && u.handleName !== user?.handleName,
+      ),
     ];
 
     const finalStoryGroups = await loadRealStoryData(sortedUsersWithStories);
@@ -311,10 +315,14 @@ export const handleUserPress = async (
       return;
     }
 
-    // ✅ Debug final story groups ordering
-    debugStoryGroups(finalStoryGroups, finalGroupIndex, 'Final Groups (Original Order + Real Data)');
+    //  Debug final story groups ordering
+    debugStoryGroups(
+      finalStoryGroups,
+      finalGroupIndex,
+      'Final Groups (Original Order + Real Data)',
+    );
 
-    // ✅ Update story screen với complete data, maintain ordering
+    // Update story screen với complete data, maintain ordering
     navigation.setParams({
       stories: finalStoryGroups[finalGroupIndex].stories,
       creator: finalStoryGroups[finalGroupIndex].creator,
@@ -322,7 +330,6 @@ export const handleUserPress = async (
       storyGroupIndex: finalGroupIndex,
       isLoading: false,
     });
-
   } catch (error) {
     GlobalAlertManager.show('Lỗi', 'Lỗi khi tải story');
     navigation.goBack();
@@ -331,12 +338,18 @@ export const handleUserPress = async (
   }
 };
 
-// ✅ Debug function để test story navigation flow
-export const debugStoryGroups = (storyGroups: any[], currentIndex: number, title?: string) => {
+//  Debug function để test story navigation flow
+export const debugStoryGroups = (
+  storyGroups: any[],
+  currentIndex: number,
+  title?: string,
+) => {
   console.log(`📱 ${title || 'Story Groups Debug'}:`);
   storyGroups.forEach((group, index) => {
     const indicator = index === currentIndex ? '👉' : '  ';
-    console.log(`${indicator} [${index}] ${group.creator.username} (${group.stories.length} stories)`);
+    console.log(
+      `${indicator} [${index}] ${group.creator.username} (${group.stories.length} stories)`,
+    );
   });
   console.log('---');
 };
@@ -347,13 +360,13 @@ export const handleHighlightPress = async (
   navigation: any,
   viewerUser: any,
   isOwner: boolean,
+  allHighlights?: any[], // Thêm parameter để truyền tất cả highlights
+  currentHighlightIndex?: number, // Thêm parameter để biết index hiện tại
 ) => {
   try {
     const detailRes = await dispatch(
-      fetchStoryDetails({storyIds: story.storyIds}), // <- đúng key
+      fetchStoryDetails({storyIds: story.storyId}),
     ).unwrap();
-
-  
 
     const seenedStories = await Promise.all(
       detailRes.map(async (item: any) => {
@@ -385,37 +398,58 @@ export const handleHighlightPress = async (
 
     const validStories = seenedStories.filter(s => s);
 
-
     if (!validStories.length) {
       GlobalAlertManager.show('Lỗi', 'Không có story hợp lệ để hiển thị');
       return;
     }
 
+    // Sử dụng thông tin từ viewerUser (người sở hữu highlight)
     const creator = {
       username: viewerUser?.handleName,
       profilePic: viewerUser?.profilePic,
-      _id: viewerUser?._id, // Thêm _id để đồng bộ với SeenStoryOwner
+      _id: viewerUser?._id,
     };
 
-    // Tạo storyGroups cho SeenStoryOwner
-    const storyGroups = [
-      {
+    // Tạo storyGroups cho tất cả highlights nếu có
+    let storyGroups: any[] = [];
+
+    if (allHighlights && allHighlights.length > 0) {
+      // Tạo storyGroups cho tất cả highlights
+      storyGroups = allHighlights.map((highlight, index) => ({
         creator,
-        stories: validStories,
-      },
-    ];
+        stories: [] as any[], // Sẽ được populate sau
+        highlightId: highlight._id,
+        collectionName: highlight.collectionName,
+        highlightIndex: index,
+      }));
 
-
+      // Set stories cho highlight hiện tại
+      if (
+        currentHighlightIndex !== undefined &&
+        storyGroups[currentHighlightIndex]
+      ) {
+        storyGroups[currentHighlightIndex].stories = validStories;
+      }
+    } else {
+      // Fallback cho trường hợp không có allHighlights
+      storyGroups = [
+        {
+          creator,
+          stories: validStories,
+        },
+      ];
+    }
 
     navigation.navigate(isOwner ? 'SeenStoryOwner' : 'SeenStory', {
       storyGroups,
-      storyGroupIndex: 0,
+      storyGroupIndex: currentHighlightIndex || 0,
       creator,
       stories: validStories, // Giữ lại để tương thích với SeenStory
       timestamp: Date.now(),
+      isHighlightMode: true, // Thêm flag để biết đang xem highlight mode
+      allHighlights, // Truyền thêm để có thể navigate giữa các highlights
     });
   } catch (error) {
-   
     GlobalAlertManager.show('Thất bại', 'Lỗi khi tải highlight');
   }
 };

@@ -438,7 +438,6 @@ export const SeenStoryOwner = ({route, navigation}: any) => {
   useEffect(() => {
     setIsVideoLoaded(false);
     setIsMusicLoaded(false);
-    setIsMediaLoading(true);
     setVideoDuration(null);
     setMusicDuration(null);
     setIsVideoPaused(false);
@@ -468,8 +467,16 @@ export const SeenStoryOwner = ({route, navigation}: any) => {
     if (currentStory) {
       const isVideo = currentStory?.mediaUrl?.endsWith('.m3u8');
       const hasMusic = !!currentStory?.music?.link;
-      if (!isVideo && !hasMusic && !isVideoPaused) {
-        startProgressAnimation();
+
+      // Chỉ set loading = true khi có video hoặc nhạc
+      if (isVideo || hasMusic) {
+        setIsMediaLoading(true);
+      } else {
+        // Nếu chỉ có ảnh, không cần loading
+        setIsMediaLoading(false);
+        if (!isVideoPaused) {
+          startProgressAnimation();
+        }
       }
     } else {
       console.warn('🚨 Current story is undefined at index:', currentIndex);

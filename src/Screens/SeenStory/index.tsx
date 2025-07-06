@@ -24,7 +24,16 @@ import {Keyboard} from 'react-native';
 import ModalShareStory, {ModalShareHandle} from './components/modalShare';
 import StoryLoadingSkeleton from '../../(tabs)/Home/components/StoryLoadingSkeleton';
 import {debugStoryGroups} from '../../(tabs)/Home/util';
-import { renderTextWithMentions } from '../../util/storyTextRenderer';
+import {renderTextWithMentions} from '../../util/storyTextRenderer';
+import {
+  fetchStoryDetails,
+  seenStory,
+} from '../../../services/StoryRedux/StorySlice';
+import {GlobalAlertManager} from '../../../components/Global/AlertModal';
+import {
+  checkStorySeenInStorage,
+  markStoryAsSeen,
+} from '../../../services/storage/storage';
 
 const screenWidth = Dimensions.get('window').width;
 const screenHeight = Dimensions.get('window').height;
@@ -84,6 +93,89 @@ export const SeenStory = ({route, navigation}: any) => {
   const [isMediaLoading, setIsMediaLoading] = useState(true);
   const shareModalRef = useRef<ModalShareHandle>(null);
 
+  // Hàm fetch stories cho highlight
+  const fetchStoriesForHighlight = async (
+    highlightId: string,
+    groupIndex: number,
+  ) => {
+    try {
+      // Tìm highlight trong allHighlights
+      const allHighlights = route.params?.allHighlights;
+      const highlight = allHighlights?.find((h: any) => h._id === highlightId);
+
+      if (!highlight || !highlight.storyId) {
+        console.error('❌ Highlight not found or no storyId');
+        return;
+      }
+
+      // Fetch story details
+      const detailRes = await dispatch(
+        fetchStoryDetails({storyIds: highlight.storyId}),
+      ).unwrap();
+
+      const seenedStories = await Promise.all(
+        detailRes.map(async (item: any) => {
+          try {
+            await dispatch(seenStory({storyId: item._id}));
+
+            const hasSeen = await checkStorySeenInStorage(
+              item._id,
+              item.createdAt,
+            );
+            if (!hasSeen) {
+              await markStoryAsSeen(item._id, item.createdAt);
+            }
+
+            return {
+              ...item,
+              uriVideo: item.mediaUrl?.endsWith('.m3u8') ? item.mediaUrl : null,
+              image:
+                item.mediaUrl?.endsWith('.jpg') ||
+                item.mediaUrl?.endsWith('.png')
+                  ? item.mediaUrl
+                  : null,
+            };
+          } catch (err) {
+            console.error('seenStory error', err);
+            return null;
+          }
+        }),
+      );
+
+      const validStories = seenedStories.filter(s => s);
+
+      if (validStories.length > 0) {
+        // Cập nhật storyGroups với stories mới
+        const updatedStoryGroups = [...currentStoryGroups];
+        updatedStoryGroups[groupIndex] = {
+          ...updatedStoryGroups[groupIndex],
+          stories: validStories,
+        };
+
+        // Navigate đến highlight mới
+        const isOwner =
+          updatedStoryGroups[groupIndex].creator?.username ===
+            user?.handleName ||
+          updatedStoryGroups[groupIndex].creator?._id === user?._id;
+        const routeName = isOwner ? 'SeenStoryOwner' : 'SeenStory';
+
+        navigation.replace(routeName, {
+          storyGroups: updatedStoryGroups,
+          storyGroupIndex: groupIndex,
+          creator: updatedStoryGroups[groupIndex].creator,
+          stories: validStories,
+          initialIndex: 0,
+          timestamp: Date.now(),
+          isHighlightMode: route.params?.isHighlightMode,
+          allHighlights: route.params?.allHighlights,
+        });
+      }
+    } catch (error) {
+      console.error('❌ Error fetching stories for highlight:', error);
+      GlobalAlertManager.show('Lỗi', 'Không thể tải highlight tiếp theo');
+    }
+  };
+
   // ✅ Listen for parameter updates and navigation focus
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
@@ -94,7 +186,7 @@ export const SeenStory = ({route, navigation}: any) => {
         setCurrentCreator(params.creator || {});
         setIsDataLoading(params.isLoading || false);
       }
-      
+
       // ✅ Resume story khi quay lại từ profile
       if (isPaused) {
         setIsPaused(false);
@@ -189,16 +281,27 @@ export const SeenStory = ({route, navigation}: any) => {
           nextGroup.creator?._id === user?._id;
         const routeName = isOwner ? 'SeenStoryOwner' : 'SeenStory';
 
-        navigation.replace(routeName, {
-          storyGroups: currentStoryGroups,
-          storyGroupIndex: nextGroupIndex,
-          creator: nextGroup.creator,
-          stories: nextGroup.stories,
-          initialIndex: 0,
-          timestamp: Date.now(),
-        });
+        // Nếu đang ở highlight mode và next group chưa có stories, fetch stories
+        if (
+          route.params?.isHighlightMode &&
+          nextGroup.highlightId &&
+          (!nextGroup.stories || nextGroup.stories.length === 0)
+        ) {
+          // Fetch stories cho highlight tiếp theo
+          fetchStoriesForHighlight(nextGroup.highlightId, nextGroupIndex);
+        } else {
+          navigation.replace(routeName, {
+            storyGroups: currentStoryGroups,
+            storyGroupIndex: nextGroupIndex,
+            creator: nextGroup.creator,
+            stories: nextGroup.stories,
+            initialIndex: 0,
+            timestamp: Date.now(),
+            isHighlightMode: route.params?.isHighlightMode,
+            allHighlights: route.params?.allHighlights,
+          });
+        }
       } else {
-
         navigation.goBack();
       }
     }
@@ -328,20 +431,19 @@ export const SeenStory = ({route, navigation}: any) => {
   const renderCaption = () => {
     const content = selectedItem?.content;
     const tags = selectedItem?.tags;
-    
-    
-  
-    const fullText = content?.text || '';
-    
-  
-    const validTags = tags?.filter((tag: any) => tag.user && tag.handleName) || [];
 
-    
-    const mentionsText = validTags.map((tag: any) => `@${tag.handleName}`).join(' ') || '';
-    const combinedText = fullText && mentionsText ? `${fullText} ${mentionsText}` : fullText || mentionsText;
-    
-  
-    
+    const fullText = content?.text || '';
+
+    const validTags =
+      tags?.filter((tag: any) => tag.user && tag.handleName) || [];
+
+    const mentionsText =
+      validTags.map((tag: any) => `@${tag.handleName}`).join(' ') || '';
+    const combinedText =
+      fullText && mentionsText
+        ? `${fullText} ${mentionsText}`
+        : fullText || mentionsText;
+
     if (!combinedText) {
       console.log('❌ [SeenStory] No combined text to display');
       return null;
@@ -354,12 +456,12 @@ export const SeenStory = ({route, navigation}: any) => {
     // Tạo mention data để có thể click từ valid tags only (adapt to backend structure)
     const mentionData = validTags.map((tag: any) => ({
       handleName: tag.handleName,
-      _id: tag.user // user field is the ID string
+      _id: tag.user, // user field is the ID string
     }));
 
     const handleMentionPress = (userId: string) => {
       // ✅ Story sẽ tự động pause thông qua blur listener
-      navigation.navigate('ProfileComp', { userID: userId });
+      navigation.navigate('ProfileComp', {userID: userId});
     };
 
     return (
@@ -369,8 +471,7 @@ export const SeenStory = ({route, navigation}: any) => {
           left,
           top,
         }}
-        activeOpacity={1}
-      >
+        activeOpacity={1}>
         {renderTextWithMentions(
           combinedText,
           mentionData,
@@ -383,7 +484,7 @@ export const SeenStory = ({route, navigation}: any) => {
           {
             color: '#4A90E2',
             fontWeight: '700',
-          }
+          },
         )}
       </TouchableOpacity>
     );
@@ -391,35 +492,32 @@ export const SeenStory = ({route, navigation}: any) => {
 
   const renderTags = () => {
     const tags = selectedItem?.tags || [];
-   
 
     return tags.map((tagData: any, index: number) => {
+      const {user: userId, position, handleName, username} = tagData;
 
-      const { user: userId, position, handleName, username } = tagData;
-      
       if (!userId || !position || !handleName) {
-        console.log('❌ [SeenStory] Missing required tag data:', {userId, position, handleName});
+        console.log('❌ [SeenStory] Missing required tag data:', {
+          userId,
+          position,
+          handleName,
+        });
         return null;
       }
 
       const {x, y} = position;
-      
+
       // ✅ Use data directly from tag object (backend puts user info at tag level)
       const finalUserData = {
         _id: userId, // user field is the ID
         handleName: handleName,
         username: username,
       };
-      
- 
 
       const tagPosition = getCaptionPosition(x * 100, y * 100);
 
       const handleTagPress = () => {
-      
         if (finalUserData._id) {
-      
-       
           navigation.navigate('ProfileComp', {
             userID: finalUserData._id,
           });
@@ -481,17 +579,20 @@ export const SeenStory = ({route, navigation}: any) => {
     setMusicDuration(null);
     setIsVideoLoaded(false);
     setIsMusicLoaded(false);
-    setIsMediaLoading(true);
     progressAnims.forEach((anim, i) => {
       if (i < currentIndex) anim.setValue(1);
       else anim.setValue(0);
     });
 
-    //  Nếu không có video/music, start luôn
+    // Chỉ set loading = true khi có video hoặc nhạc
     const hasVideo = !!selectedItem.uriVideo;
     const hasMusic = !!selectedItem.music?.link;
 
-    if (!hasVideo && !hasMusic) {
+    if (hasVideo || hasMusic) {
+      setIsMediaLoading(true);
+    } else {
+      // Nếu chỉ có ảnh, không cần loading
+      setIsMediaLoading(false);
       startProgressAnimation();
     }
   }, [currentIndex]);

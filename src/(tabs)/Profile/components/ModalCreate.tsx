@@ -1,27 +1,20 @@
 import React from 'react';
 import {
-  Modal,
   View,
   Text,
-  StyleSheet,
   TouchableOpacity,
-  Pressable,
+  Modal,
+  StyleSheet,
+  Dimensions,
 } from 'react-native';
-import {
-  Video,
-  FileText,
-  Image as ImageIcon,
-  CircleFadingArrowUp,
-  Camera,
-  Sparkles,
-} from 'lucide-react-native';
 import {useTheme} from '../../../util/ThemeContext';
 import {Colors} from '../../../../assets/color/Colors';
+import {Video, Image, Plus, BookOpen} from 'lucide-react-native';
 
 interface ModalCreateProps {
   visible: boolean;
   onClose: () => void;
-  onSelect: (optionId: string) => void;
+  onSelect: (id: string) => void;
 }
 
 const ModalCreate: React.FC<ModalCreateProps> = ({
@@ -31,125 +24,127 @@ const ModalCreate: React.FC<ModalCreateProps> = ({
 }) => {
   const {theme} = useTheme();
   const color = Colors[theme];
+
+  const options = [
+    {
+      id: 'reels',
+      title: 'Reels',
+      icon: Video,
+      color: '#FF6B6B',
+    },
+    {
+      id: 'post',
+      title: 'Bài viết',
+      icon: Image,
+      color: '#4ECDC4',
+    },
+    {
+      id: 'story',
+      title: 'Story',
+      icon: Plus,
+      color: '#45B7D1',
+    },
+    {
+      id: 'highlight',
+      title: 'Highlight',
+      icon: BookOpen,
+      color: '#96CEB4',
+    },
+  ];
+
   return (
-    <Modal visible={visible} animationType="slide" transparent>
-      <Pressable style={styles.overlay} onPress={onClose}>
-        <Pressable
-          style={[styles.container, {backgroundColor: color.background}]}
-          onPress={() => {}}>
-          <Text style={[styles.title, {color: color.text}]}>Tạo</Text>
-          <TouchableOpacity
-            style={styles.option}
-            onPress={() => {
-              onSelect('reels');
-              onClose();
-            }}>
-            <View style={styles.icon}>
-              <Video size={24} color={color.text} />
-            </View>
-            <Text style={[styles.label, {color: color.text}]}>Thước phim</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.option}
-            onPress={() => {
-              onSelect('post');
-              onClose();
-            }}>
-            <View style={styles.icon}>
-              <FileText size={24} color={color.text} />
-            </View>
-            <Text style={[styles.label, {color: color.text}]}>Bài viết</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.option}
-            onPress={() => {
-              onSelect('story');
-              onClose();
-            }}>
-            <View style={styles.icon}>
-              <ImageIcon size={24} color={color.text} />
-            </View>
-            <Text style={[styles.label, {color: color.text}]}>Tin</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.option}
-            onPress={() => {
-              onSelect('highlight');
-              onClose();
-            }}>
-            <View style={styles.icon}>
-              <CircleFadingArrowUp size={24} color={color.text} />
-            </View>
-            <Text style={[styles.label, {color: color.text}]}>Tin nổi bật</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.option}
-            onPress={() => {
-              onSelect('live');
-              onClose();
-            }}>
-            <View style={styles.icon}>
-              <Camera size={24} color={color.text} />
-            </View>
-            <Text style={[styles.label, {color: color.text}]}>
-              Video trực tiếp
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}>
+      <View style={styles.overlay}>
+        <View style={[styles.modal, {backgroundColor: color.background}]}>
+          <View style={styles.header}>
+            <Text style={[styles.title, {color: color.text}]}>
+              Tạo nội dung mới
             </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.option}
-            onPress={() => {
-              onSelect('ai');
-              onClose();
-            }}>
-            <View style={styles.icon}>
-              <Sparkles size={24} color={color.text} />
-            </View>
-            <Text style={[styles.label, {color: color.text}]}>AI</Text>
-          </TouchableOpacity>
-        </Pressable>
-      </Pressable>
+            <TouchableOpacity onPress={onClose}>
+              <Text style={[styles.closeButton, {color: color.text}]}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.optionsContainer}>
+            {options.map(option => (
+              <TouchableOpacity
+                key={option.id}
+                style={styles.option}
+                onPress={() => {
+                  onSelect(option.id);
+                  onClose();
+                }}>
+                <View
+                  style={[
+                    styles.iconContainer,
+                    {backgroundColor: option.color},
+                  ]}>
+                  <option.icon size={24} color="white" />
+                </View>
+                <Text style={[styles.optionTitle, {color: color.text}]}>
+                  {option.title}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </View>
     </Modal>
   );
 };
 
-export default ModalCreate;
-
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  container: {
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    paddingTop: 16,
-    paddingHorizontal: 20,
-    paddingBottom: 30,
-    gap: 20,
+  modal: {
+    width: Dimensions.get('window').width * 0.8,
+    borderRadius: 12,
+    padding: 20,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
   },
   title: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  closeButton: {
     fontSize: 20,
     fontWeight: '600',
-    alignSelf: 'center',
-    marginBottom: 16,
+  },
+  optionsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
   },
   option: {
-    flexDirection: 'row',
+    width: '48%',
     alignItems: 'center',
-    paddingVertical: 14,
+    padding: 15,
+    marginBottom: 10,
   },
-  icon: {
-    width: 30,
+  iconContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 8,
   },
-  label: {
-    fontSize: 16,
-    marginLeft: 16,
+  optionTitle: {
+    fontSize: 14,
+    fontWeight: '500',
   },
 });
+
+export default ModalCreate;

@@ -205,7 +205,7 @@ export const HighlightCreateScreen = () => {
           setEditModalVisible(false);
           setSelectedStories([]);
           navigation.goBack();
-          navigation.navigate('Account');
+          navigation.navigate('Account', {shouldRefreshHighlights: true});
         }}
         isProcessing={isProcessing}
         setIsProcessing={setIsProcessing}

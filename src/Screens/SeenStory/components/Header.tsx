@@ -31,7 +31,7 @@ export const Header = ({
       const created = new Date(createdAt);
       const diffMs = now.getTime() - created.getTime();
 
-      if (diffMs >= 24 * 60 * 60 * 1000) {
+      if (diffMs < 0 || diffMs >= 24 * 60 * 60 * 1000) {
         setTimeAgo('');
         return;
       }
@@ -44,8 +44,10 @@ export const Header = ({
         setTimeAgo(`${hours} giờ trước`);
       } else if (minutes > 0) {
         setTimeAgo(`${minutes} phút trước`);
-      } else {
+      } else if (seconds > 0) {
         setTimeAgo(`${seconds} giây trước`);
+      } else {
+        setTimeAgo('Vừa xong');
       }
     };
 

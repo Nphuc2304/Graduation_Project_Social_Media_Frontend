@@ -36,16 +36,10 @@ const SeenStoryOwnerHeader: React.FC<Props> = ({
     const updateTimeAgo = () => {
       const now = new Date();
       const created = new Date(createdAt);
+      const diffMs = now.getTime() - created.getTime();
 
-      // Lấy offset múi giờ hiện tại (ví dụ: -420 phút = GMT+7)
-      const timezoneOffset = now.getTimezoneOffset(); // đơn vị: phút
-      const localCreated = new Date(
-        created.getTime() - timezoneOffset * 60 * 1000,
-      );
-
-      const diffMs = now.getTime() - localCreated.getTime();
-
-      if (diffMs >= 24 * 60 * 60 * 1000) {
+      // Kiểm tra nếu thời gian âm (trong tương lai) hoặc quá 24 giờ
+      if (diffMs < 0 || diffMs >= 24 * 60 * 60 * 1000) {
         setTimeAgo('');
         return;
       }
@@ -54,12 +48,15 @@ const SeenStoryOwnerHeader: React.FC<Props> = ({
       const minutes = Math.floor(seconds / 60);
       const hours = Math.floor(minutes / 60);
 
+      // Format thời gian với số ít/ nhiều
       if (hours > 0) {
         setTimeAgo(`${hours} giờ trước`);
       } else if (minutes > 0) {
         setTimeAgo(`${minutes} phút trước`);
-      } else {
+      } else if (seconds > 0) {
         setTimeAgo(`${seconds} giây trước`);
+      } else {
+        setTimeAgo('Vừa xong');
       }
     };
 
@@ -67,6 +64,7 @@ const SeenStoryOwnerHeader: React.FC<Props> = ({
     const interval = setInterval(updateTimeAgo, 1000);
     return () => clearInterval(interval);
   }, [createdAt]);
+
   const renderProgressBars = () => {
     return (
       <View style={styles.progressContainer}>

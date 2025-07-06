@@ -36,7 +36,15 @@ import {getPostsAndReelsOfUser} from '../../../services/postUserRedux/postUserSl
 import ACNavigateModal, {
   ACNavigateRef,
 } from '../../../src/Screens/AccountCenter/components/ACNavigateModal';
-import { fetchTaggedPosts } from '@services/taggedPostRedux/taggedPostSlice';
+import {fetchTaggedPosts} from '@services/taggedPostRedux/taggedPostSlice';
+import {
+  fetchHighlightStory,
+  fetchStoryDetails,
+} from '../../../services/StoryRedux/StorySlice';
+import HighlightStories from './components/HighlightStories';
+import HighlightStoriesSkeleton from './components/HiglightStoriesSkeleton';
+import {useHighlightStoryDetails} from './hook/useHighlightStoryDetails';
+import {useProfileData} from './hook/useProfileData';
 
 const Profile = () => {
   const navigation: any = useNavigation();
@@ -57,6 +65,7 @@ const Profile = () => {
     (state: RootState) => state.postUser.reels,
   );
   const {isSuccess} = useSelector((state: RootState) => state.postUser);
+  const {highlightStories} = useSelector((state: RootState) => state.stories);
   const [visibleModalCreate, setVisibleModalCreate] = useState(false);
   const [isSwitchAccountVisible, setSwitchAccountVisible] = useState(false);
   const handleUsernamePress = () => {
@@ -66,17 +75,20 @@ const Profile = () => {
 
   const [isViewMoreVisible, setViewMoreVisible] = useState(false);
 
-  useEffect(() => {
-    if (userId) {
-      Promise.all([
-        dispatch(fetchFollowers({userId: userId})),
-        dispatch(fetchFollowing({userId: userId})),
-        dispatch(fetchTaggedPosts(userId)),
-      ]).catch(error => {
-        console.error('Error fetching relations:', error);
-      });
-    }
-  }, [dispatch, userId]);
+  // Hook để quản lý highlight story details
+  const {
+    storyGroups,
+    loadingStates,
+    fetchedHighlights,
+    fetchStoryDetailsForHighlight,
+    fetchMoreOnScroll,
+  } = useHighlightStoryDetails({
+    highlights: highlightStories,
+    userId,
+  });
+
+  // Hook để quản lý dữ liệu Profile
+  const {fetchProfileData} = useProfileData();
 
   // These two State Functionals below is for handle the length of bio
   const [needsTruncation, setNeedsTruncation] = useState(false);
@@ -206,8 +218,7 @@ const Profile = () => {
           <View style={styles.modeContainer}>
             <Moon size={14} color={color.textSecondary} />
             <Text style={[styles.modeText, {color: color.textSecondary}]}>
-              {' '}
-              {/* in quiet mode */} Ở chế độ im lặng
+              Ở chế độ im lặng
             </Text>
           </View>
           {handleLengthBio(user?.bio)}
@@ -234,12 +245,72 @@ const Profile = () => {
               Chia sẻ trang cá nhân
             </Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.optionButton, {backgroundColor: color.gray}]}
-            onPress={() => navigation.navigate('Swipe')}>
-            <Share2 size={18} color={color.text} />
-          </TouchableOpacity>
         </View>
+
+        {/* Highlight Stories Section */}
+        {highlightStories && highlightStories.length > 0 ? (
+          <HighlightStories
+            highlights={highlightStories}
+            loadingStates={loadingStates}
+            onHighlightPress={async highlight => {
+              try {
+                // Kiểm tra xem highlight đã được fetch chưa
+                if (!fetchedHighlights.has(highlight._id)) {
+                  // Nếu chưa fetch, fetch ngay lập tức
+                  await fetchStoryDetailsForHighlight(highlight);
+                }
+
+                // Tìm story group tương ứng
+                const currentStoryGroup = storyGroups.find(
+                  group => group.highlightId === highlight._id,
+                );
+
+                if (!currentStoryGroup) {
+                  console.warn(
+                    '⚠️ Story group not found for highlight:',
+                    highlight._id,
+                  );
+                  return;
+                }
+
+                // Tìm index của highlight hiện tại
+                const currentHighlightIndex = highlightStories.findIndex(
+                  h => h._id === highlight._id,
+                );
+
+                // Story groups đã được sắp xếp theo thứ tự của highlights
+                const orderedStoryGroups = storyGroups;
+
+                if (orderedStoryGroups.length > 0) {
+                  navigation.navigate('SeenStoryOwner', {
+                    storyGroups: orderedStoryGroups,
+                    storyGroupIndex:
+                      currentHighlightIndex >= 0 ? currentHighlightIndex : 0,
+                    creator: {
+                      username: user?.handleName,
+                      profilePic: user?.profilePic,
+                      _id: user?._id,
+                    },
+                    stories: currentStoryGroup.stories,
+                    timestamp: Date.now(),
+                    isHighlightMode: true,
+                  });
+                } else {
+                  console.warn('⚠️ No valid story groups found');
+                }
+              } catch (error) {
+                console.error('❌ Error navigating to highlight:', error);
+              }
+            }}
+            onAddHighlight={() => {
+              navigation.navigate('Archive');
+            }}
+            onScroll={fetchMoreOnScroll}
+          />
+        ) : (
+          <HighlightStoriesSkeleton />
+        )}
+
         <ModalCreate
           visible={visibleModalCreate}
           onClose={() => setVisibleModalCreate(false)}
@@ -342,8 +413,29 @@ const Profile = () => {
   useFocusEffect(
     useCallback(() => {
       dispatch(getPostsAndReelsOfUser({refreshToken, userId: userId}));
+      // Fetch highlight stories khi focus vào Profile
+      if (userId) {
+        dispatch(fetchHighlightStory({userId}));
+      }
     }, [dispatch, refreshToken, userId]),
   );
+
+  // Lắng nghe navigation params để refresh highlight stories
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      const params = navigation
+        .getState()
+        .routes.find((route: any) => route.name === 'Account')?.params;
+
+      if (params?.shouldRefreshHighlights && userId) {
+        dispatch(fetchHighlightStory({userId}));
+        // Clear the parameter to prevent infinite refresh
+        navigation.setParams({shouldRefreshHighlights: false});
+      }
+    });
+
+    return unsubscribe;
+  }, [navigation, dispatch, userId]);
 
   return (
     <SafeAreaView style={{flex: 1, backgroundColor: color.background}}>

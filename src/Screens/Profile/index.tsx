@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, {useState, useCallback, useEffect, useRef} from 'react';
 import {
   StyleSheet,
   Text,
@@ -16,36 +16,42 @@ import {
   UserSquare2,
   Video,
 } from 'lucide-react-native';
-import { useNavigation } from '@react-navigation/native';
-import { useTheme } from '../../util/ThemeContext';
-import { Colors } from '../../../assets/color/Colors';
+import {useNavigation} from '@react-navigation/native';
+import {useTheme} from '../../util/ThemeContext';
+import {Colors} from '../../../assets/color/Colors';
 import StoryComponent from './components/story.component';
 import ActionButtons from './components/actionButton.component';
 import UserInfo from './components/userInfo.component';
-import { Modalize } from 'react-native-modalize';
-import { Portal } from 'react-native-portalize';
+import {Modalize} from 'react-native-modalize';
+import {Portal} from 'react-native-portalize';
 import OptionModal from './components/optionModal';
-import { useDispatch, useSelector } from 'react-redux';
-import { AppDispatch, RootState } from '../../../services/store';
+import {useDispatch, useSelector} from 'react-redux';
+import {AppDispatch, RootState} from '../../../services/store';
 import {
   fetchFollowers,
   fetchFollowing,
   relationAction,
 } from '../../../services/relationRedux/relationSlice';
-import { getPublicProfile } from '../../../services/userRedux/userSlice';
-import { clearPublicProfile } from '../../../services/userRedux/userReducer';
-import { createRoom } from '../../../services/roomRedux/roomSlice';
+import {getPublicProfile} from '../../../services/userRedux/userSlice';
+import {clearPublicProfile} from '../../../services/userRedux/userReducer';
+import {createRoom} from '../../../services/roomRedux/roomSlice';
 import {
   PostsView,
   ReelsView,
 } from '../../(tabs)/Profile/components/PostView.component';
-import { getPostsAndReelsOfUser } from '../../../services/postUserRedux/postUserSlice';
-import { clearPostsAndReels } from '../../../services/postUserRedux/postUserReducer';
-import { GlobalAlertManager } from '../../../components/Global/AlertModal';
+import {getPostsAndReelsOfUser} from '../../../services/postUserRedux/postUserSlice';
+import {clearPostsAndReels} from '../../../services/postUserRedux/postUserReducer';
+import {
+  fetchHighlightStory,
+  fetchStoryDetails,
+} from '../../../services/StoryRedux/StorySlice';
+import {GlobalAlertManager} from '../../../components/Global/AlertModal';
+import HighlightStories from '../../(tabs)/Profile/components/HighlightStories';
+import {handleHighlightPress} from '../../(tabs)/Home/util';
 
-const ProfileComp = ({ route }: any) => {
+const ProfileComp = ({route}: any) => {
   const navigation: any = useNavigation();
-  const { theme } = useTheme();
+  const {theme} = useTheme();
   const styles = createStyles(theme);
   const userID: string = route.params?.userID;
   const modalOptionRef = useRef<Modalize>(null);
@@ -74,7 +80,7 @@ const ProfileComp = ({ route }: any) => {
         }),
       ).unwrap();
 
-      const { room } = res;
+      const {room} = res;
 
       const otherUsers = room.user_ids.filter(user => user._id !== myUserId);
       const img1 = otherUsers[0]?.profilePic;
@@ -136,7 +142,7 @@ const ProfileComp = ({ route }: any) => {
         relationAction({
           targetId: userID,
           action: 'unblock',
-        })
+        }),
       ).unwrap();
     } catch (error) {
       GlobalAlertManager.show('Thất bại', 'Vui lòng thử lại sau.');
@@ -156,18 +162,21 @@ const ProfileComp = ({ route }: any) => {
     errorMessagePublicProfile,
   } = useSelector((state: RootState) => state.user);
 
-  const { items: PostsItem }: any | null = useSelector(
+  const {items: PostsItem}: any | null = useSelector(
     (state: RootState) => state.postUser.posts,
   );
-  const { items: ReelsItem }: any | null = useSelector(
+  const {items: ReelsItem}: any | null = useSelector(
     (state: RootState) => state.postUser.reels,
   );
 
-  const { isSuccess } = useSelector((state: RootState) => state.postUser);
-  const { refreshToken } = useSelector((state: RootState) => state.user);
+  const {isSuccess} = useSelector((state: RootState) => state.postUser);
+  const {refreshToken} = useSelector((state: RootState) => state.user);
+  const {highlightStories} = useSelector((state: RootState) => state.stories);
 
   const initializeProfile = useCallback(async () => {
-    if (!userID) { return; }
+    if (!userID) {
+      return;
+    }
 
     setIsInitializing(true);
 
@@ -179,13 +188,14 @@ const ProfileComp = ({ route }: any) => {
       }
 
       // Fetch parallel
-      const [profile, followersData, followingData, postData] = await Promise.all([
-        dispatch(getPublicProfile({ userId: userID })).unwrap(),
-        dispatch(fetchFollowers({ userId: userID })).unwrap(),
-        dispatch(fetchFollowing({ userId: userID })).unwrap(),
-        dispatch(getPostsAndReelsOfUser({ refreshToken, userId: userID })),
-      ]);
-
+      const [profile, followersData, followingData, postData, highlightData] =
+        await Promise.all([
+          dispatch(getPublicProfile({userId: userID})).unwrap(),
+          dispatch(fetchFollowers({userId: userID})).unwrap(),
+          dispatch(fetchFollowing({userId: userID})).unwrap(),
+          dispatch(getPostsAndReelsOfUser({refreshToken, userId: userID})),
+          dispatch(fetchHighlightStory({userId: userID})),
+        ]);
 
       // Wait for profile first to set user states
       setIsFollowing(profile.userFollowing ?? false);
@@ -250,7 +260,7 @@ const ProfileComp = ({ route }: any) => {
   };
 
   const LoadingPlaceholder = () => (
-    <View style={[styles.content, styles.centerItem, { height: 50 }]}>
+    <View style={[styles.content, styles.centerItem, {height: 50}]}>
       <Text style={styles.textno}>Đang tải...</Text>
     </View>
   );
@@ -261,7 +271,7 @@ const ProfileComp = ({ route }: any) => {
       <SafeAreaView style={styles.container}>
         <View style={styles.Header}>
           <TouchableOpacity
-            style={{ alignItems: 'center', paddingRight: 12 }}
+            style={{alignItems: 'center', paddingRight: 12}}
             onPress={() => navigation.goBack()}>
             <ChevronLeft size={28} color={Colors[theme].text} />
           </TouchableOpacity>
@@ -279,14 +289,13 @@ const ProfileComp = ({ route }: any) => {
     );
   }
 
-
   // Show error message if failed to load profile
   if (isErrorPublicProfile || !publicProfile) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.Header}>
           <TouchableOpacity
-            style={{ alignItems: 'center', paddingRight: 12 }}
+            style={{alignItems: 'center', paddingRight: 12}}
             onPress={() => navigation.goBack()}>
             <ChevronLeft size={28} color={Colors[theme].text} />
           </TouchableOpacity>
@@ -307,7 +316,7 @@ const ProfileComp = ({ route }: any) => {
             style={styles.retryButton}
             onPress={() => {
               dispatch(clearPublicProfile());
-              dispatch(getPublicProfile({ userId: userID }));
+              dispatch(getPublicProfile({userId: userID}));
             }}>
             <Text style={styles.retryButtonText}>Thử lại</Text>
           </TouchableOpacity>
@@ -321,7 +330,7 @@ const ProfileComp = ({ route }: any) => {
       <ScrollView style={styles.container}>
         <View style={styles.Header}>
           <TouchableOpacity
-            style={{ alignItems: 'center', paddingRight: 12 }}
+            style={{alignItems: 'center', paddingRight: 12}}
             onPress={() => navigation.goBack()}>
             <ChevronLeft size={28} color={Colors[theme].text} />
           </TouchableOpacity>
@@ -356,9 +365,40 @@ const ProfileComp = ({ route }: any) => {
           isBlocked={isBlock}
         />
         {/* Story Highlights */}
-        {/* {!isBlock && (
-          <StoryComponent isPrivate={isPrivate} highlights={highlights} />
-        )} */}
+        {!isBlock && highlightStories && highlightStories.length > 0 && (
+          <HighlightStories
+            highlights={highlightStories}
+            showAddButton={false}
+            onHighlightPress={async highlight => {
+              // Tạo object với thông tin của người sở hữu highlight
+              const highlightOwner = {
+                _id: userID,
+                handleName: publicProfile?.handleName,
+                profilePic: publicProfile?.profilePic,
+                username: publicProfile?.username,
+              };
+
+              // Tìm index của highlight hiện tại
+              const currentHighlightIndex = highlightStories.findIndex(
+                h => h._id === highlight._id,
+              );
+
+              await handleHighlightPress(
+                highlight,
+                dispatch,
+                navigation,
+                highlightOwner, // Truyền thông tin người sở hữu highlight
+                false, // isOwner = false vì đây là profile của người khác
+                highlightStories, // Truyền tất cả highlights
+                currentHighlightIndex, // Truyền index hiện tại
+              );
+            }}
+            onAddHighlight={() => {
+              // Không làm gì vì đây là profile của người khác
+              return;
+            }}
+          />
+        )}
         {/* Posts Grid/Video Tabs */}
         {/* {!isBlock && (
           <>
