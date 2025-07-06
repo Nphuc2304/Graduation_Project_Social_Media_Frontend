@@ -41,13 +41,15 @@ import {
 } from '../../(tabs)/Profile/components/PostView.component';
 import {getPostsAndReelsOfUser} from '../../../services/postUserRedux/postUserSlice';
 import {clearPostsAndReels} from '../../../services/postUserRedux/postUserReducer';
+
 import {
   fetchHighlightStory,
   fetchStoryDetails,
 } from '../../../services/StoryRedux/StorySlice';
-import {GlobalAlertManager} from '../../../components/Global/AlertModal';
 import HighlightStories from '../../(tabs)/Profile/components/HighlightStories';
 import {handleHighlightPress} from '../../(tabs)/Home/util';
+import {GlobalAlertManager} from '../../../components/Global/AlertModal';
+import {fetchTaggedPosts} from '@services/taggedPostRedux/taggedPostSlice';
 
 const ProfileComp = ({route}: any) => {
   const navigation: any = useNavigation();
@@ -171,7 +173,12 @@ const ProfileComp = ({route}: any) => {
 
   const {isSuccess} = useSelector((state: RootState) => state.postUser);
   const {refreshToken} = useSelector((state: RootState) => state.user);
+
   const {highlightStories} = useSelector((state: RootState) => state.stories);
+
+  const profileTaggedPosts = useSelector(
+    (state: RootState) => state.taggedPosts.data,
+  );
 
   const initializeProfile = useCallback(async () => {
     if (!userID) {
@@ -187,7 +194,6 @@ const ProfileComp = ({route}: any) => {
         dispatch(clearPostsAndReels());
       }
 
-      // Fetch parallel
       const [profile, followersData, followingData, postData, highlightData] =
         await Promise.all([
           dispatch(getPublicProfile({userId: userID})).unwrap(),
@@ -195,6 +201,10 @@ const ProfileComp = ({route}: any) => {
           dispatch(fetchFollowing({userId: userID})).unwrap(),
           dispatch(getPostsAndReelsOfUser({refreshToken, userId: userID})),
           dispatch(fetchHighlightStory({userId: userID})),
+
+          dispatch(fetchHighlightStory({userId: userID})),
+
+          dispatch(fetchTaggedPosts(userID)),
         ]);
 
       // Wait for profile first to set user states
