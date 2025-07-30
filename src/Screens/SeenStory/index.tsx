@@ -13,6 +13,8 @@ import {
   toggleLikeStory,
   deleteStory,
   fetchFollowingStories,
+  fetchStoryDetails,
+  seenStory,
 } from '../../../services/StoryRedux/StorySlice';
 import {styles} from './components/styles';
 import {Header} from './components/Header';
@@ -30,6 +32,7 @@ import {VideoRef} from 'react-native-video';
 import {GestureResponderEvent} from 'react-native-modal';
 import {Portal} from 'react-native-portalize';
 import {useHeadAlert} from '../../../components/Global/HeadAlertProvider';
+import {DraggableCaption} from '../../../components/DraggableCaption';
 
 // Import owner-specific components
 import ModelPeopleSeen from './componentStoryOwner/ModelPeopleSeen';
@@ -46,6 +49,8 @@ export const SeenStory = ({route, navigation}: any) => {
     storyGroups = [],
     storyGroupIndex = 0,
     isLoading = false,
+    storyId,
+    creatorId,
   } = route.params || {};
 
   // ✅ State để handle loading và update params
@@ -95,6 +100,97 @@ export const SeenStory = ({route, navigation}: any) => {
   const isCurrentUserStory =
     currentCreator?.handleName === user?.handleName ||
     currentCreator?._id === user?._id;
+
+  // ✅ Handle deeplink navigation
+  useEffect(() => {
+    if (storyId && creatorId && !stories.length) {
+      console.log('🔄 Starting deeplink navigation...');
+      console.log('Story ID:', storyId);
+      console.log('Creator ID:', creatorId);
+      console.log('Current stories length:', stories.length);
+
+      // Handle deeplink navigation - fetch story data
+      const handleDeeplinkStory = async () => {
+        try {
+          setIsDataLoading(true);
+          console.log('📡 Fetching story details...');
+
+          // Fetch story details
+          const storyDetails = await dispatch(
+            fetchStoryDetails({storyIds: [storyId]}),
+          ).unwrap();
+
+          console.log(
+            '📡 Story details received:',
+            storyDetails.length,
+            'stories',
+          );
+
+          if (storyDetails.length > 0) {
+            const story = storyDetails[0];
+            console.log('📖 Story data:', {
+              id: story._id,
+              mediaUrl: story.mediaUrl,
+              hasVideo: story.mediaUrl?.endsWith('.mp4'),
+              hasMusic: !!story.music?.link,
+            });
+
+            // Fetch creator information
+            const creatorInfo = followingUsers.find(u => u._id === creatorId);
+            console.log('👤 Creator info found:', !!creatorInfo);
+
+            if (creatorInfo) {
+              setCurrentCreator({
+                username: creatorInfo.username,
+                handleName: creatorInfo.handleName,
+                profilePic: creatorInfo.profilePic,
+                _id: creatorInfo._id,
+              });
+
+              setStories([story]);
+              setCurrentStoryGroups([
+                {
+                  creator: creatorInfo,
+                  stories: [story],
+                },
+              ]);
+
+              console.log('✅ Story and creator set successfully');
+
+              // Mark story as seen
+              await dispatch(seenStory({storyId}));
+            } else {
+              console.log('❌ Creator not found in following users');
+              // If creator not found in following users, show error
+              showAlert('Lỗi', 'Không tìm thấy người dùng này');
+              navigation.goBack();
+            }
+          } else {
+            console.log('❌ No story details found');
+            showAlert('Lỗi', 'Không tìm thấy story');
+            navigation.goBack();
+          }
+        } catch (error) {
+          console.error('❌ Error handling deeplink story:', error);
+          showAlert('Lỗi', 'Không thể tải story');
+          navigation.goBack();
+        } finally {
+          setIsDataLoading(false);
+          console.log('🏁 Deeplink navigation completed');
+        }
+      };
+
+      handleDeeplinkStory();
+    }
+  }, [
+    storyId,
+    creatorId,
+    stories.length,
+    dispatch,
+    followingUsers,
+    navigation,
+    showAlert,
+  ]);
 
   // ✅ Sync stories with Redux store data and filter out deleted stories
   const syncedStories = useMemo(() => {
@@ -274,15 +370,19 @@ export const SeenStory = ({route, navigation}: any) => {
     });
   }, [currentIndex, syncedStories.length, progressAnims.length]);
 
-  const selectedItem = useMemo(
-    () => syncedStories[currentIndex] || {},
-    [syncedStories, currentIndex],
-  );
-
-  // ✅ Show loading skeleton if data is still loading or story is loading
-  if (isDataLoading || selectedItem.isLoading) {
-    return <StoryLoadingSkeleton />;
-  }
+  const selectedItem = useMemo(() => {
+    const item = syncedStories[currentIndex];
+    if (!item) {
+      console.log(
+        'No story found at index:',
+        currentIndex,
+        'Total stories:',
+        syncedStories.length,
+      );
+      return null;
+    }
+    return item;
+  }, [syncedStories, currentIndex]);
 
   useEffect(() => {
     const hasVideo = !!selectedItem?.uriVideo;
@@ -344,6 +444,9 @@ export const SeenStory = ({route, navigation}: any) => {
 
   // ✅ Owner-specific: Progress animation with tracking
   const startProgressAnimation = (forceRestart = false) => {
+    // Don't start animation if story is paused (modal is open)
+    if (isPaused) return;
+
     if (isCurrentUserStory) {
       // Owner mode: Use tracking progress
       if (animationRef.current) {
@@ -639,17 +742,6 @@ export const SeenStory = ({route, navigation}: any) => {
     }
   };
 
-  // Tính toán vị trí caption từ percentage sang pixel để đảm bảo nhất quán với EditStory
-  const getCaptionPosition = (xPercent: number, yPercent: number) => {
-    // Sử dụng screenWidth và screenHeight để đảm bảo nhất quán với EditStory
-    const width = screenWidth;
-    const height = screenHeight;
-    return {
-      left: (xPercent / 100) * width,
-      top: (yPercent / 100) * height,
-    };
-  };
-
   const renderCaption = () => {
     const content = selectedItem?.content;
     const tags = selectedItem?.tags;
@@ -672,7 +764,13 @@ export const SeenStory = ({route, navigation}: any) => {
       return null;
     }
 
-    const position = getCaptionPosition(content?.x || 50, content?.y || 50);
+    // ✅ Debug vị trí caption để đảm bảo tính toán chính xác
+    console.log('🎯 Caption position:', {
+      xPercent: content?.x || 10,
+      yPercent: content?.y || 20,
+      screenWidth,
+      screenHeight,
+    });
 
     // Tạo mention data để có thể click từ valid tags only (adapt to backend structure)
     const mentionData = validTags.map((tag: any) => ({
@@ -690,34 +788,36 @@ export const SeenStory = ({route, navigation}: any) => {
       }
     };
 
+    // ✅ Custom render function để hỗ trợ mentions
+    const renderTextWithMentionsWrapper = (text: string) => {
+      return renderTextWithMentions(
+        text,
+        mentionData,
+        handleMentionPress,
+        {
+          color: '#fff',
+          fontSize: 20,
+          fontWeight: 'bold',
+          textAlign: 'center',
+        },
+        {
+          color: '#4A90E2',
+          fontWeight: '700',
+        },
+      );
+    };
+
     return (
-      <TouchableOpacity
+      <DraggableCaption
+        text={combinedText}
+        initialX={content?.x || 10}
+        initialY={content?.y || 20}
+        draggable={false} // Không cho phép kéo trong SeenStory
+        renderText={renderTextWithMentionsWrapper}
         style={{
-          position: 'absolute',
-          ...position,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          borderRadius: 8,
-          padding: 5,
-          minWidth: 100,
-          maxWidth: screenWidth * 0.8,
+          zIndex: 1000,
         }}
-        activeOpacity={1}>
-        {renderTextWithMentions(
-          combinedText,
-          mentionData,
-          handleMentionPress,
-          {
-            color: '#fff',
-            fontSize: 18,
-            fontWeight: '600',
-            textAlign: 'center',
-          },
-          {
-            color: '#4A90E2',
-            fontWeight: '700',
-          },
-        )}
-      </TouchableOpacity>
+      />
     );
   };
 
@@ -800,6 +900,7 @@ export const SeenStory = ({route, navigation}: any) => {
     if (isCurrentUserStory) return; // Owner doesn't have share
 
     stopCurrentAnimation();
+    setIsPaused(true); // Pause story when opening share modal
     shareModalRef.current?.open(); // phải dùng ref để mở Modal
   };
 
@@ -808,6 +909,7 @@ export const SeenStory = ({route, navigation}: any) => {
     if (isCurrentUserStory) return; // Owner can't reply to their own story
 
     stopCurrentAnimation();
+    setIsPaused(true); // Pause story when opening reply modal
     replyModalRef.current?.open(); // phải dùng ref để mở Modal
   };
 
@@ -828,6 +930,11 @@ export const SeenStory = ({route, navigation}: any) => {
       }
     };
   }, [isCurrentUserStory]);
+
+  // ✅ Show loading skeleton if data is still loading, story is loading, or no story selected
+  if (isDataLoading || !selectedItem || selectedItem.isLoading) {
+    return <StoryLoadingSkeleton />;
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -856,28 +963,32 @@ export const SeenStory = ({route, navigation}: any) => {
           progressAnims={progressAnims}
           storyCount={syncedStories.length}
         />
-        <MediaPlayer
-          key={`${selectedItem?._id}-${currentIndex}`} // ✅ Force re-render khi chuyển story
-          item={selectedItem}
-          ref={videoRef}
-          onLoad={d => {
-            setVideoDuration(d.duration);
-            setIsVideoLoaded(true);
-          }}
-          onEnd={goToNextStory}
-          onMediaLayout={setMediaSize}
-          onMusicLoad={seconds => {
-            setMusicDuration(seconds);
-            setIsMusicLoaded(true);
-          }}
-          onMusicEnd={goToNextStory}
-          paused={isPaused}
-          muted={isMuted}
-          isMediaLoading={isMediaLoading}
-          onImageLoad={onImageLoad}
-          forceReset={true} // ✅ Force reset sound khi chuyển story
-        />
-        {renderCaption()}
+
+        {/* ✅ Thêm container tương tự như EditStory để đảm bảo vị trí caption chính xác */}
+        <View style={styles.mediaTouchArea}>
+          <MediaPlayer
+            key={`${selectedItem?._id}-${currentIndex}`} // ✅ Force re-render khi chuyển story
+            item={selectedItem}
+            ref={videoRef}
+            onLoad={d => {
+              setVideoDuration(d.duration);
+              setIsVideoLoaded(true);
+            }}
+            onEnd={goToNextStory}
+            onMediaLayout={setMediaSize}
+            onMusicLoad={seconds => {
+              setMusicDuration(seconds);
+              setIsMusicLoaded(true);
+            }}
+            onMusicEnd={goToNextStory}
+            paused={isPaused}
+            muted={isMuted}
+            isMediaLoading={isMediaLoading}
+            onImageLoad={onImageLoad}
+            forceReset={true} // ✅ Force reset sound khi chuyển story
+          />
+          {renderCaption()}
+        </View>
         {/* {renderTags()} */}
       </TouchableOpacity>
 
@@ -925,11 +1036,13 @@ export const SeenStory = ({route, navigation}: any) => {
               mediaUrl: selectedItem?.mediaUrl,
               type: selectedItem?.uriVideo ? 'video' : 'image',
             }}
+            creatorId={currentCreator?._id}
             onOpen={() => {
-              setIsPaused(true); // dừng story
+              // Story is already paused in handleOpenShare
               stopCurrentAnimation(); // đảm bảo animation ngừng
             }}
             onClose={() => {
+              // Chỉ resume story khi modal thực sự đóng hoàn toàn
               setIsPaused(false); // tiếp tục
               startProgressAnimation(); // gọi lại animation!
             }}
@@ -943,10 +1056,11 @@ export const SeenStory = ({route, navigation}: any) => {
             }}
             creatorId={currentCreator?._id}
             onOpen={() => {
-              setIsPaused(true); // dừng story
+              // Story is already paused in handleOpenReply
               stopCurrentAnimation(); // đảm bảo animation ngừng
             }}
             onClose={() => {
+              // Chỉ resume story khi modal thực sự đóng hoàn toàn
               setIsPaused(false); // tiếp tục
               startProgressAnimation(); // gọi lại animation!
             }}

@@ -14,7 +14,6 @@ import {
   Platform,
 } from 'react-native';
 import Video, {OnLoadData, OnProgressData, VideoRef} from 'react-native-video';
-import Draggable from 'react-native-draggable';
 import {GestureHandlerRootView} from 'react-native-gesture-handler';
 import Sound from 'react-native-sound';
 import {useUploadProgress} from '../../../services/UploadProgressManager';
@@ -32,6 +31,7 @@ import BottomSheet, {
   BottomSheetRef,
 } from '../PostStory/BottomSheet/BottomSheetMusic';
 import {useHeadAlert} from '../../../components/Global/HeadAlertProvider';
+import {DraggableCaption} from '../../../components/DraggableCaption';
 
 const screenWidth = Dimensions.get('window').width;
 const screenHeight = Dimensions.get('window').height;
@@ -53,8 +53,9 @@ export const EditStory = ({route, navigation}: any) => {
   const videoRef = useRef<VideoRef>(null);
   const audioRef = useRef<Sound | null>(null); // ref cho âm thanh
   const sheetRef = useRef<BottomSheetRef>(null);
-  // Lưu trữ vị trí caption theo percentage (0-100) để đảm bảo nhất quán với SeenStory
-  const positionRef = useRef({x: 10, y: 20}); // Mặc định ở góc trên bên trái (10% x, 20% y)
+
+  // ✅ Lưu trữ vị trí thực tế để tính toán chính xác
+  const [captionPosition, setCaptionPosition] = useState({x: 10, y: 20});
   const [initialized, setInitialized] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [selectedMusic, setSelectedMusic] = useState<{
@@ -242,6 +243,11 @@ export const EditStory = ({route, navigation}: any) => {
     navigation.goBack();
   };
 
+  // ✅ Callback để cập nhật vị trí caption
+  const handleCaptionPositionChange = (x: number, y: number) => {
+    setCaptionPosition({x, y});
+  };
+
   const renderProgressBar = () => {
     const width = progressAnim.interpolate({
       inputRange: [0, 1],
@@ -349,12 +355,12 @@ export const EditStory = ({route, navigation}: any) => {
         };
       }
 
-      // Chỉ gửi content nếu có text sau khi remove mentions
+      // ✅ Sử dụng vị trí caption đã được cập nhật từ gesture
       if (isValidContent && cleanText.length > 0) {
         payload.content = {
           text: cleanText,
-          x: Number(positionRef.current.x) || 10,
-          y: Number(positionRef.current.y) || 20,
+          x: Number(captionPosition.x) || 10,
+          y: Number(captionPosition.y) || 20,
         };
       }
 
@@ -407,6 +413,21 @@ export const EditStory = ({route, navigation}: any) => {
     }
   };
   const [isPause, setIsPause] = useState<boolean>(true);
+
+  // ✅ Render caption với DraggableCaption component
+  const renderCaption = () => {
+    if (!caption) return null;
+
+    return (
+      <DraggableCaption
+        text={caption}
+        initialX={captionPosition.x}
+        initialY={captionPosition.y}
+        onPositionChange={handleCaptionPositionChange}
+        draggable={true}
+      />
+    );
+  };
 
   return (
     <GestureHandlerRootView style={styles.container}>
@@ -485,55 +506,7 @@ export const EditStory = ({route, navigation}: any) => {
                     Không có media để hiển thị
                   </Text>
                 )}
-                {caption && (
-                  <Draggable
-                    x={
-                      !initialized
-                        ? (positionRef.current.x / 100) * screenWidth
-                        : undefined
-                    }
-                    y={
-                      !initialized
-                        ? (positionRef.current.y / 100) * screenHeight
-                        : undefined
-                    }
-                    onDragRelease={(event, gestureState) => {
-                      const mediaWidth = screenWidth;
-                      const mediaHeight = screenHeight;
-
-                      // Tính toán vị trí tuyệt đối dựa trên vị trí hiện tại (đã được convert từ %)
-                      const currentAbsoluteX =
-                        (positionRef.current.x / 100) * mediaWidth;
-                      const currentAbsoluteY =
-                        (positionRef.current.y / 100) * mediaHeight;
-
-                      // Cộng thêm delta từ gesture
-                      let newAbsoluteX = currentAbsoluteX + gestureState.dx;
-                      let newAbsoluteY = currentAbsoluteY + gestureState.dy;
-
-                      // Giới hạn vị trí để caption không bị tràn ra ngoài màn hình
-                      const captionWidth = screenWidth * 0.8; // maxWidth của caption
-                      const captionHeight = 50; // Ước tính chiều cao caption
-
-                      newAbsoluteX = Math.max(
-                        0,
-                        Math.min(mediaWidth - captionWidth, newAbsoluteX),
-                      );
-                      newAbsoluteY = Math.max(
-                        0,
-                        Math.min(mediaHeight - captionHeight, newAbsoluteY),
-                      );
-
-                      // Convert về percentage
-                      positionRef.current.x = (newAbsoluteX / mediaWidth) * 100;
-                      positionRef.current.y =
-                        (newAbsoluteY / mediaHeight) * 100;
-                    }}>
-                    <View style={styles.textInputContainer}>
-                      <Text style={styles.captionText}>{caption}</Text>
-                    </View>
-                  </Draggable>
-                )}
+                {renderCaption()}
               </View>
             </TouchableWithoutFeedback>
           </View>

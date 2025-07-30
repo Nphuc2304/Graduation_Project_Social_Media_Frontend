@@ -75,11 +75,17 @@ export const styles = StyleSheet.create({
   },
   mediaWrapper: {
     flex: 1,
+    position: 'relative',
+  },
+  mediaTouchArea: {
+    flex: 1,
+    position: 'relative',
   },
   media: {
     flex: 1,
     width: '100%',
     height: '100%',
+    position: 'relative',
   },
   progressContainer: {
     flexDirection: 'row',

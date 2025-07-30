@@ -1,22 +1,23 @@
 import {
-  Image,
-  KeyboardAvoidingView,
-  Platform,
   SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
+  KeyboardAvoidingView,
+  Platform,
+  ActivityIndicator,
 } from 'react-native';
 import {useRoute, useNavigation, useIsFocused} from '@react-navigation/native';
 import {useEffect, useRef, useState} from 'react';
-import {BottomSheetCommentRef} from '../src/(tabs)/Home/components/CommentSection';
+import BottomSheetComment, {
+  BottomSheetCommentRef,
+} from '../src/(tabs)/Home/components/CommentSection';
 import ItemHome from '../src/(tabs)/Home/components/ItemHome';
 import {useTheme} from '../src/util/ThemeContext';
 import {Colors} from '../assets/color/Colors';
 import axiosInstance from '@services/axiosInstance';
-import CommentSection from './CommentSection';
 import {ArrowLeft} from 'lucide-react-native';
 
 interface RouteParams {
@@ -31,11 +32,11 @@ const PostDetailScreen = () => {
   const colors = Colors[theme];
   const isFocused = useIsFocused();
 
-  const {postId, commentId} = route.params as RouteParams;
+  const {postId} = route.params as RouteParams;
 
-  const sheetRef = useRef<BottomSheetCommentRef>(null);
   const [post, setPost] = useState<any | null>(null);
-
+  const [isError, setIsError] = useState(false);
+  const sheetRef = useRef<BottomSheetCommentRef>(null);
   const selectedPostRef = useRef<{postId: string; receiverId: string}>({
     postId: '',
     receiverId: '',
@@ -44,30 +45,20 @@ const PostDetailScreen = () => {
   useEffect(() => {
     const fetchPostById = async () => {
       try {
-        const {data} = await axiosInstance.get(
-          `http://cirla.io.vn/posts/${postId}`,
-          {
-            headers: {
-              token: 'refresh',
-            },
+        const {data} = await axiosInstance.get(`/posts/${postId}`, {
+          headers: {
+            token: 'refresh',
           },
-        );
+        });
         setPost(data.data);
       } catch (error) {
-        console.warn( error);
+        console.warn('Lỗi khi fetch post:', error);
+        setIsError(true);
+        setPost(null);
       }
     };
-
     fetchPostById();
   }, [postId]);
-
-  if (!post) {
-    return (
-      <SafeAreaView style={styles.centeredContainer}>
-        <Text style={{color: colors.text}}>Đang tải bài viết...</Text>
-      </SafeAreaView>
-    );
-  }
 
   return (
     <SafeAreaView style={{flex: 1, backgroundColor: colors.background}}>
@@ -85,29 +76,30 @@ const PostDetailScreen = () => {
           <View style={styles.iconBack} />
         </View>
 
-        <ScrollView keyboardShouldPersistTaps="handled">
-          <ItemHome
-            _id={post._id}
-            type={post.type}
-            caption={post.caption}
-            createdAt={post.createdAt}
-            media={post.media}
-            user={post.user}
-            isLike={post.isLike}
-            isBookmarked={post.isBookmarked}
-            commentCount={post.commentCount}
-            likeCount={post.likeCount}
-            share={post.share}
-            music={post.music}
-            currentVisible={true}
-            isFocused={isFocused}
-            sheetRef={sheetRef}
-            isFollow={post.isFollow}
-            SelectedPostRef={selectedPostRef}
-          />
+        {!post ? (
+          <SafeAreaView style={styles.centeredContainer}>
+            {isError ? (
+              <Text style={{color: colors.text}}>
+                Bài viết này đã bị ẩn hoặc không tồn tại
+              </Text>
+            ) : (
+              <ActivityIndicator size={'large'} color={colors.primary} />
+            )}
+          </SafeAreaView>
+        ) : (
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <ItemHome
+              {...post}
+              currentVisible={true}
+              isFocused={isFocused}
+              sheetRef={sheetRef}
+              SelectedPostRef={selectedPostRef}
+            />
+          </ScrollView>
+        )}
 
-          <CommentSection postId={post._id} receiverId={post.user?._id} />
-        </ScrollView>
+        {/* ✅ BottomSheet comment giống Home */}
+        <BottomSheetComment ref={sheetRef} selectedPostRef={selectedPostRef} />
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -122,7 +114,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 24,
     paddingVertical: 15,
-    borderBottomWidth: 0.5,
+    elevation: 4,
   },
   iconBack: {
     width: 14,

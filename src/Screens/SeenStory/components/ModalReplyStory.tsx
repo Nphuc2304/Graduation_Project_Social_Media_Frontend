@@ -24,7 +24,7 @@ import {
   fetchMyRooms,
 } from '../../../../services/roomRedux/roomSlice';
 import {GlobalAlertManager} from '../../../../components/Global/AlertModal';
-import {X, Send} from 'lucide-react-native';
+import {X, Send, MessageCircle} from 'lucide-react-native';
 import {Colors} from '../../../../assets/color/Colors';
 import {useTheme} from '../../../util/ThemeContext';
 
@@ -168,7 +168,7 @@ const ModalReplyStory = forwardRef<ModalReplyHandle, ModalReplyStoryProps>(
         <KeyboardAvoidingView
           style={{
             flex: 1,
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            backgroundColor: 'rgba(0, 0, 0, 0.6)',
           }}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
           <View
@@ -179,12 +179,20 @@ const ModalReplyStory = forwardRef<ModalReplyHandle, ModalReplyStoryProps>(
             <View
               style={{
                 backgroundColor: color.background,
-                borderTopLeftRadius: 20,
-                borderTopRightRadius: 20,
-                paddingTop: 20,
-                paddingBottom: Platform.OS === 'ios' ? 40 : 20,
-                minHeight: height * 0.3,
-                maxHeight: height * 0.5,
+                borderTopLeftRadius: 24,
+                borderTopRightRadius: 24,
+                paddingTop: 24,
+                paddingBottom: Platform.OS === 'ios' ? 50 : 24,
+                minHeight: height * 0.35,
+                maxHeight: height * 0.6,
+                shadowColor: '#000',
+                shadowOffset: {
+                  width: 0,
+                  height: -4,
+                },
+                shadowOpacity: 0.1,
+                shadowRadius: 12,
+                elevation: 8,
               }}>
               {/* Header */}
               <View
@@ -192,21 +200,34 @@ const ModalReplyStory = forwardRef<ModalReplyHandle, ModalReplyStoryProps>(
                   flexDirection: 'row',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  paddingHorizontal: 20,
-                  paddingBottom: 15,
+                  paddingHorizontal: 24,
+                  paddingBottom: 20,
                   borderBottomWidth: 1,
-                  borderBottomColor: '#f0f0f0',
+                  borderBottomColor: color.border || '#f0f0f0',
                 }}>
-                <Text
+                <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                  <MessageCircle
+                    size={20}
+                    color={color.primary}
+                    style={{marginRight: 8}}
+                  />
+                  <Text
+                    style={{
+                      fontSize: 20,
+                      fontWeight: '700',
+                      color: color.text,
+                    }}>
+                    Reply Story
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={handleClose}
                   style={{
-                    fontSize: 18,
-                    fontWeight: '600',
-                    color: color.text,
+                    padding: 8,
+                    borderRadius: 20,
+                    backgroundColor: color.backgroundSecondary,
                   }}>
-                  Reply Story
-                </Text>
-                <TouchableOpacity onPress={handleClose}>
-                  <X size={24} color={color.text} />
+                  <X size={20} color={color.text} />
                 </TouchableOpacity>
               </View>
 
@@ -214,18 +235,29 @@ const ModalReplyStory = forwardRef<ModalReplyHandle, ModalReplyStoryProps>(
               <View
                 style={{
                   flex: 1,
-                  paddingHorizontal: 20,
-                  paddingTop: 20,
+                  paddingHorizontal: 24,
+                  paddingTop: 24,
+                  paddingBottom: 16,
                 }}>
                 <View
                   style={{
                     flexDirection: 'row',
                     alignItems: 'flex-end',
                     backgroundColor: color.backgroundSecondary,
-                    borderRadius: 20,
-                    paddingHorizontal: 15,
-                    paddingVertical: 10,
-                    minHeight: 50,
+                    borderRadius: 24,
+                    paddingHorizontal: 16,
+                    paddingVertical: 12,
+                    minHeight: 56,
+                    borderWidth: 1,
+                    borderColor: message.trim() ? color.primary : 'transparent',
+                    shadowColor: '#000',
+                    shadowOffset: {
+                      width: 0,
+                      height: 2,
+                    },
+                    shadowOpacity: 0.05,
+                    shadowRadius: 4,
+                    elevation: 2,
                   }}>
                   <TextInput
                     ref={inputRef}
@@ -233,10 +265,11 @@ const ModalReplyStory = forwardRef<ModalReplyHandle, ModalReplyStoryProps>(
                       flex: 1,
                       fontSize: 16,
                       color: color.text,
-                      maxHeight: 100,
-                      paddingVertical: 5,
+                      maxHeight: 120,
+                      paddingVertical: 8,
+                      lineHeight: 22,
                     }}
-                    placeholder="Nhập tin nhắn..."
+                    placeholder="Nhập tin nhắn reply story..."
                     placeholderTextColor={color.textSecondary}
                     value={message}
                     onChangeText={setMessage}
@@ -252,21 +285,43 @@ const ModalReplyStory = forwardRef<ModalReplyHandle, ModalReplyStoryProps>(
                     onPress={handleSendReply}
                     disabled={!message.trim() || isSending}
                     style={{
-                      marginLeft: 10,
-                      padding: 8,
-                      borderRadius: 20,
+                      marginLeft: 12,
+                      padding: 12,
+                      borderRadius: 24,
                       backgroundColor: message.trim()
                         ? color.primary
                         : color.backgroundSecondary,
                       opacity: isSending ? 0.7 : 1,
+                      shadowColor: message.trim()
+                        ? color.primary
+                        : 'transparent',
+                      shadowOffset: {
+                        width: 0,
+                        height: 2,
+                      },
+                      shadowOpacity: 0.3,
+                      shadowRadius: 4,
+                      elevation: message.trim() ? 4 : 0,
                     }}>
                     {isSending ? (
                       <ActivityIndicator size="small" color="#fff" />
                     ) : (
-                      <Send size={20} color="#fff" />
+                      <Send size={18} color="#fff" />
                     )}
                   </TouchableOpacity>
                 </View>
+
+                {/* Helper Text */}
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: color.textSecondary,
+                    marginTop: 12,
+                    textAlign: 'center',
+                    fontStyle: 'italic',
+                  }}>
+                  Tin nhắn sẽ được gửi đến người đăng story
+                </Text>
               </View>
             </View>
           </View>

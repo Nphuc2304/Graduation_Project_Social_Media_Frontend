@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState, memo } from 'react';
 import {
   View,
   Text,
@@ -31,6 +31,8 @@ import { PlaylistItem, Media, MediaR } from '@services/bookmarkRedux/bookmarkTyp
 import {
   ArrowLeft,
   MoreVertical,
+  LayoutGrid,
+  Clapperboard,
   X,
   Check,
   Video,
@@ -60,6 +62,7 @@ export const PlaylistsScreen = () => {
   const [selectedItem, setSelectedItem] = useState<any | null>(null);
   const [isSelec, setIsSelect] = useState(false);
   const [listSelected, setListSelected] = useState<string[]>([]);
+
   const [newPlaylistName, setNewPlaylistName] = useState('');
   const [titleMain, setTitle] = useState(title);
 
@@ -115,7 +118,6 @@ export const PlaylistsScreen = () => {
 
   const renderItemThumb = useCallback(
     (item: PlaylistItem) => {
-      // console.log(item);
       const isVideo = item.type === 'reel';
       if (!item.media || item.media.length === 0) {
         return null;

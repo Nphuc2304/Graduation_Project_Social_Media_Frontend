@@ -174,46 +174,21 @@ const ActionModalMessage = ({visible, onClose, content, setChat}: Props) => {
             <TouchableOpacity
               style={styles.featureContainer}
               onPress={async () => {
-                if (content) {
-                  try {
-                    const resultAction = await dispatch(
-                      deleteMessageById({messageId: content._id}),
-                    );
+                if (content && socket) {
+                  socket.emit('deleteMessage', {
+                    messageId: content._id,
+                    userId: user?._id,
+                    roomId: content.roomId,
+                  });
 
-                    if (deleteMessageById.fulfilled.match(resultAction)) {
-                      const {deleted, reason} = resultAction.payload;
+                  showAlert('Thông báo', 'bạn đã xoá tin nhắn');
 
-                      if (deleted) {
-                        setChat(prev =>
-                          prev.map(msg =>
-                            msg._id === content._id
-                              ? {
-                                  ...msg,
-                                  isDelete: true,
-                                  content: 'Tin nhắn đã bị thu hồi',
-                                }
-                              : msg,
-                          ),
-                        );
-                        onClose();
-                      } else {
-                        GlobalAlertManager.show(
-                          'Thất bại',
-                          reason || 'Bạn không thể xoá tin nhắn này',
-                        );
-                      }
-                    } else {
-                      const reason = resultAction.payload || 'Xoá thất bại';
-                      GlobalAlertManager.show('Lỗi', reason);
-                    }
-                  } catch (err) {
-                    GlobalAlertManager.show(
-                      'Lỗi',
-                      'Đã xảy ra lỗi khi xoá tin nhắn',
-                    );
-                  } finally {
-                    onClose();
-                  }
+                  onClose();
+                } else {
+                  GlobalAlertManager.show(
+                    'Thất bại',
+                    'Bạn không thể xoá tin nhắn này',
+                  );
                 }
               }}>
               <Trash2 size={22} color="black" />

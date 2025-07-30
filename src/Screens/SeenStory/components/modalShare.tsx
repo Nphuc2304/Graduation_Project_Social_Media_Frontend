@@ -18,7 +18,7 @@ import {fetchMyRooms} from '@services/roomRedux/roomSlice';
 import ChatRoomAvatar from '../../../../components/ChatRoomAvatar';
 import {RootState, AppDispatch} from '../../../../services/store';
 import {RoomUser} from '@services/roomRedux/roomType';
-import {Search, UserPlus, Link, CheckCircle} from 'lucide-react-native';
+import {Search, UserPlus, Link, CheckCircle, Check} from 'lucide-react-native';
 import LoadingModal from '../../../../components/Global/LoadingModal';
 import {shareStory} from '../../../../services/StoryRedux/StorySlice';
 import {GlobalAlertManager} from '../../../../components/Global/AlertModal';
@@ -46,10 +46,11 @@ interface ModalShareProps {
     mediaUrl: string;
     type?: 'image' | 'video';
   };
+  creatorId?: string;
 }
 
 const ModalShareStory = forwardRef<ModalShareHandle, ModalShareProps>(
-  ({isDark, onOpen, onClose, storyData}, ref) => {
+  ({isDark, onOpen, onClose, storyData, creatorId}, ref) => {
     const {theme} = useTheme();
     let color;
     if (isDark) {
@@ -60,6 +61,7 @@ const ModalShareStory = forwardRef<ModalShareHandle, ModalShareProps>(
     const [selectedFriendIds, setSelectedFriendIds] = useState<string[]>([]);
     const [message, setMessage] = useState('');
     const [isSharing, setIsSharing] = useState(false);
+    const [isLinkCopied, setIsLinkCopied] = useState(false);
 
     const dispatch = useDispatch<AppDispatch>();
     const userID = useSelector((s: RootState) => s.user.user?._id);
@@ -171,8 +173,6 @@ const ModalShareStory = forwardRef<ModalShareHandle, ModalShareProps>(
 
         await dispatch(shareStory(payload)).unwrap();
 
-        GlobalAlertManager.show('Thành công', 'Đã chia sẻ story thành công');
-
         // Close modal and reset
         modalizeRef.current?.close();
         setSelectedFriendIds([]);
@@ -186,9 +186,24 @@ const ModalShareStory = forwardRef<ModalShareHandle, ModalShareProps>(
     };
 
     const handleCopyLink = () => {
-      if (storyData?.mediaUrl) {
-        Clipboard.setString(storyData.mediaUrl);
-        GlobalAlertManager.show('Thành công', 'Đã sao chép liên kết');
+      if (storyData?._id) {
+        // Generate deeplink for the story - use universal link format
+        const deeplink = `https://cirla.io.vn/story/${storyData._id}/${
+          creatorId || ''
+        }`;
+
+        // Debug: log the deeplink
+        console.log('Generated deeplink:', deeplink);
+        console.log('Story ID:', storyData._id);
+        console.log('Creator ID:', creatorId);
+
+        Clipboard.setString(deeplink);
+        setIsLinkCopied(true);
+
+        // Reset the icon after 2 seconds
+        setTimeout(() => {
+          setIsLinkCopied(false);
+        }, 2000);
       } else {
         GlobalAlertManager.show('Lỗi', 'Không có liên kết để sao chép');
       }
@@ -281,9 +296,8 @@ const ModalShareStory = forwardRef<ModalShareHandle, ModalShareProps>(
       actionItem: {
         alignItems: 'center',
         justifyContent: 'center',
-        width: 72,
-        height: 72,
-        marginBottom: Colors.spacing.s,
+        width: 40,
+        height: 40,
       },
       actionLabel: {
         color: color.text,
@@ -392,7 +406,16 @@ const ModalShareStory = forwardRef<ModalShareHandle, ModalShareProps>(
                 ]}
                 placeholderTextColor={color.textSecondary}
               />
-              <UserPlus size={20} color="#aaa" />
+
+              <TouchableOpacity
+                style={styles.actionItem}
+                onPress={handleCopyLink}>
+                {isLinkCopied ? (
+                  <Check size={24} color={Colors.primary} />
+                ) : (
+                  <Link size={24} color={color.text} />
+                )}
+              </TouchableOpacity>
             </View>
           </View>
 
@@ -476,16 +499,7 @@ const ModalShareStory = forwardRef<ModalShareHandle, ModalShareProps>(
                   </Text>
                 </TouchableOpacity>
               </View>
-            ) : (
-              <View style={styles.shareActions}>
-                <TouchableOpacity
-                  style={styles.actionItem}
-                  onPress={handleCopyLink}>
-                  <Link size={20} color={color.text} />
-                  <Text style={styles.actionLabel}>Sao chép liên kết</Text>
-                </TouchableOpacity>
-              </View>
-            ))}
+            ) : null)}
         </View>
       </Modalize>
     );

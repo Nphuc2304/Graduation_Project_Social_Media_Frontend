@@ -13,32 +13,90 @@ interface Props {
 
 const BookmarkedPlaylist: React.FC<Props> = ({title, thumbnails, coverImg}) => {
   const styles = useBookmarkStyles();
-  const [thumbUris, setThumbUris] = useState<string[] | null>(null);
+  const [thumbUris, setThumbUris] = useState<string[]>([]);
 
   useEffect(() => {
-    const videoUris = thumbnails.filter(u => !!u).slice(0, 4);
+    // Validate URLs and categorize them as images or videos
+    const isValidUrl = (url: string): boolean => {
+      if (!url || typeof url !== 'string') return false;
+      const trimmed = url.trim();
+      if (trimmed.length === 0) return false;
+      if (!trimmed.startsWith('http')) return false;
+      if (trimmed === 'null' || trimmed === 'undefined') return false;
+      if (trimmed.length < 10) return false;
+      return true;
+    };
 
-    Promise.all(
-      videoUris.map(uri =>
-        createThumbnail({url: uri, timeStamp: 2000})
-          .then(res => {
-            const path = res.path;
-            if (!path) return null;
-            // Android cần file:// prefix
-            return Platform.OS === 'android' && !path.startsWith('file://')
-              ? `file://${path}`
-              : path;
+    const isImageUrl = (url: string): boolean => {
+      const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'];
+      return imageExtensions.some(ext => url.toLowerCase().includes(ext));
+    };
+
+    const isVideoUrl = (url: string): boolean => {
+      const videoExtensions = ['.mp4', '.mov', '.avi', '.mkv', '.webm', '.m4v'];
+      return videoExtensions.some(ext => url.toLowerCase().includes(ext));
+    };
+
+    // Filter and categorize valid URLs
+    const validUrls = thumbnails?.filter(isValidUrl).slice(0, 4) || [];
+    const imageUrls = validUrls.filter(isImageUrl);
+    const videoUrls = validUrls.filter(isVideoUrl);
+
+    if (validUrls.length === 0) {
+      setThumbUris([]);
+      return;
+    }
+
+    const processUrls = async () => {
+      const results: string[] = [];
+
+      imageUrls.forEach(url => {
+        results.push(url);
+      });
+
+      if (videoUrls.length > 0) {
+        const videoThumbnails = await Promise.all(
+          videoUrls.map(async (uri) => {
+            try {
+              const result = await createThumbnail({
+                url: uri,
+                timeStamp: 2000
+              });
+
+              const path = result.path;
+              if (!path) return null;
+
+              // Android needs file:// prefix
+              const finalPath = Platform.OS === 'android' && !path.startsWith('file://')
+                ? `file://${path}`
+                : path;
+
+              return finalPath;
+            } catch (error) {
+              return null;
+            }
           })
-          .catch(() => null),
-      ),
-    ).then(results => {
-      const valid = results.filter((p): p is string => !!p);
-      setThumbUris(valid);
-    });
-  }, [thumbnails]);
+        );
+        videoThumbnails.forEach(thumb => {
+          if (thumb) results.push(thumb);
+        });
+      }
+
+      setThumbUris(results);
+    };
+
+    processUrls();
+  }, [thumbnails, title]);
 
   if (thumbUris === null) {
-    return;
+    return (
+      <View style={styles.playlistContainer}>
+        <View style={[styles.fullImage, { justifyContent: 'center', alignItems: 'center' }]}>
+          <ActivityIndicator size="small" color={Colors.textSecondary} />
+        </View>
+        <Text style={styles.playlistTitle}>{title}</Text>
+      </View>
+    );
   }
 
   // Nếu có thumbnail valid thì dùng, không thì coverImg

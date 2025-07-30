@@ -108,40 +108,51 @@ const MessageItemComponent: React.FC<MessageItemProps> = memo(
           .join('');
 
         return (
-          <>
-            <Pressable onPress={handleImagePress} onLongPress={handleLongPress}>
-              <View
-                style={{
-                  width: 150,
-                  height: 200,
-                  borderRadius: 10,
-                  overflow: 'hidden',
-                }}>
-                <Image
-                  source={{uri: item.media.url}}
-                  style={{width: '100%', height: '100%'}}
-                  resizeMode="cover"
-                />
-              </View>
-            </Pressable>
-            {filteredText !== '' && (
-              <Text
-                style={{
-                  color: color.text,
-                  fontSize: 14,
-                  marginBottom: 8,
-                  lineHeight: 20,
-                  fontWeight: '400',
-                  paddingHorizontal: 12,
-                  paddingVertical: 8,
-                  backgroundColor: color.primary,
-                  borderRadius: 8,
-                  marginTop: 2,
-                }}>
-                {filteredText}
-              </Text>
-            )}
-          </>
+          <Pressable onPress={handleImagePress} onLongPress={handleLongPress}>
+            <View
+              style={{
+                width: 150,
+                height: 200,
+                borderRadius: 10,
+                overflow: 'hidden',
+                position: 'relative',
+              }}>
+              <Image
+                source={{uri: item.media.url}}
+                style={{width: '100%', height: '100%'}}
+                resizeMode="cover"
+              />
+              {filteredText !== '' && (
+                <View
+                  style={{
+                    position: 'absolute',
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                    paddingHorizontal: 8,
+                    paddingVertical: 6,
+                    borderBottomLeftRadius: 10,
+                    borderBottomRightRadius: 10,
+                  }}>
+                  <Text
+                    style={{
+                      color: '#ffffff',
+                      fontSize: 12,
+                      lineHeight: 16,
+                      fontWeight: '400',
+                      textShadowColor: 'rgba(0, 0, 0, 0.8)',
+                      textShadowOffset: {width: 0, height: 1},
+                      textShadowRadius: 2,
+                    }}
+                    numberOfLines={3}
+                    ellipsizeMode="tail">
+                    {filteredText}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </Pressable>
         );
       }
 
