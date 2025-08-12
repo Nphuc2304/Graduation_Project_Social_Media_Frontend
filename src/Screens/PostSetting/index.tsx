@@ -31,7 +31,6 @@ import {TaggedMedia} from '../TagSo';
 import {GlobalAlertManager} from '../../../components/Global/AlertModal';
 import {checkProfanityAndAlert} from '../../util/profanityFilter';
 import {fetchFollowers} from '@services/relationRedux/relationSlice';
-import MentionSuggestion from './Components/MentionSuggestion';
 import Animated, {
   useAnimatedScrollHandler,
   useSharedValue,
@@ -131,7 +130,7 @@ export const PostSetting = () => {
         if (media.tags?.length) {
           uploadedItem.tags = media.tags.map(tag => ({
             userId: tag.user._id,
-            handleName: tag.user.handleName,
+            handleName: tag.user.username,
             positionX: tag.position.x,
             positionY: tag.position.y,
           }));
