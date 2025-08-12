@@ -2,7 +2,7 @@ import {Image, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
 import React from 'react';
 import {useTheme} from '../../../../src/util/ThemeContext';
 import {Colors} from '../../../../assets/color/Colors';
-import {X} from 'lucide-react-native';
+import {Check, X} from 'lucide-react-native';
 
 export interface UserProps {
   image: string;
@@ -10,12 +10,13 @@ export interface UserProps {
   handle: string;
   isDelete?: boolean;
   func: () => void;
+  isSelect?: boolean;
 }
 
 const User = (props: UserProps) => {
   const {theme} = useTheme();
   const colors = Colors[theme];
-  const {image, name, handle, isDelete, func} = props;
+  const {image, name, handle, isDelete, func, isSelect=false} = props;
   return (
     <TouchableOpacity
       style={{
@@ -58,6 +59,9 @@ const User = (props: UserProps) => {
         <TouchableOpacity onPress={func}>
           <X size={22} color={colors.textSecondary} />
         </TouchableOpacity>
+      )}
+      {isSelect && (
+        <Check size={22} color={colors.primary}/>
       )}
     </TouchableOpacity>
   );

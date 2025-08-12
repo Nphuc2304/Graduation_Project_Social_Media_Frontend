@@ -18,15 +18,17 @@ import {UserProfile} from '@services/relationRedux/relationTypes';
 import {useFocusEffect} from '@react-navigation/native';
 import LoadingModal from '../../../../components/Global/LoadingModal';
 import { Colors } from '@assets/color/Colors';
+import { TaggedMedia } from '..';
 
 type ModalSearchProps = {
   visible: boolean;
   setVisible: (visible: boolean) => void;
   onSelectUser: (user: UserProfile) => void;
+  mediaCurrent: TaggedMedia;
 };
 
 const ModalSearch = (props: ModalSearchProps) => {
-  const {visible, setVisible, onSelectUser}: ModalSearchProps = props;
+  const {visible, setVisible, onSelectUser, mediaCurrent}: ModalSearchProps = props;
   const [searchText, setSearchText] = useState('');
   const [searchList, setSearchList] = useState<UserProfile[]>([]);
   const {theme} = useTheme();
@@ -105,6 +107,7 @@ const ModalSearch = (props: ModalSearchProps) => {
                       name={item.item.username}
                       handle={item.item.handleName}
                       func={() => handleSelectUser(item.item)}
+                      isSelect={mediaCurrent.tags.some(tag => tag.user._id === item.item._id)}
                     />
                   );
                 }}
