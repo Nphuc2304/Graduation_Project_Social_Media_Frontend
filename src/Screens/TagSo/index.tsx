@@ -177,6 +177,7 @@ export const TagSo = () => {
       <ModalSearch
         visible={visible}
         setVisible={setVisible}
+        mediaCurrent={media[currentImageIndex]}
         onSelectUser={(item: UserProfile) => handleSelectUser(item)}
       />
     </SafeAreaView>
