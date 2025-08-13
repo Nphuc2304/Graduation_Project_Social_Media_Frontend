@@ -17,6 +17,10 @@
   <uses-permission android:name="android.permission.VIBRATE" />
   <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
   <uses-permission android:name="android.permission.MANAGE_OWN_CALLS" />
+  <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+  <uses-permission android:name="android.permission.DISABLE_KEYGUARD" />
+  <uses-permission android:name="android.permission.TURN_SCREEN_ON" />
+  <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
   <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" android:required="false" />
     
     <application
@@ -26,6 +30,9 @@
       android:roundIcon="@mipmap/ic_launcher_round"
       android:allowBackup="false"
       android:theme="@style/AppTheme"
+      android:showWhenLocked="true"
+      android:turnScreenOn="true"
+      android:showOnLockScreen="true"
       android:usesCleartextTraffic="true">
 
       <meta-data
@@ -95,10 +102,26 @@
       </service>
 
       <service
+        android:name="io.wazo.callkeep.RNCallKeepBackgroundMessagingService"
+        android:enabled="true"
+        android:exported="false"
+        android:foregroundServiceType="phoneCall" />
+
+      <service
         android:name="io.invertase.firebase.messaging.ReactNativeFirebaseMessagingService"
         android:exported="true"
         android:permission="com.google.android.c2dm.permission.SEND"
         tools:replace="android:exported">
+        <intent-filter>
+          <action android:name="com.google.firebase.MESSAGING_EVENT" />
+        </intent-filter>
+      </service>
+
+      <service
+        android:name=".CustomFirebaseMessagingService"
+        android:exported="true"
+        android:permission="com.google.android.c2dm.permission.SEND"
+        tools:node="replace">
         <intent-filter>
           <action android:name="com.google.firebase.MESSAGING_EVENT" />
         </intent-filter>
@@ -114,5 +137,12 @@
           android:name="com.google.firebase.messaging.default_notification_channel_id"
           android:value="default"
           tools:replace="android:value" />
+
+      <meta-data
+            android:name="io.wazo.callkeep.RINGTONE_FILE"
+            android:value="android.resource://com.cirla/raw/ringtone" />
+        <meta-data
+            android:name="io.wazo.callkeep.AVATAR_FILE"
+            android:value="android.resource://com.cirla/drawable/ic_default_avatar" />
     </application>
 </manifest>
