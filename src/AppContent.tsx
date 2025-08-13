@@ -1,4 +1,4 @@
-import React, {useEffect} from 'react';
+import React, {useEffect, useRef} from 'react';
 import AppNavigator from './Navigation/AppNavigation';
 import Toast from 'react-native-toast-message';
 import {
@@ -10,13 +10,22 @@ import NotificationModal from '@services/notification/NotificationModal';
 import {createNotificationChannel} from '@services/notification/notification';
 import {useNotificationHandler} from '@services/notification/useNotification';
 import {navigationRef} from './NavigationService';
-import {Linking} from 'react-native';
+import {Linking, AppState, Platform, AppStateStatus} from 'react-native';
 import {navigateFromUrl} from './core/deeplinkHandler';
 import RNCallKeep from 'react-native-callkeep';
-import { setupCallKeep } from '@services/CallKeepService';
+import { 
+  setupCallKeep, 
+  setCallActive, 
+  endCall,
+  isCallKeepAvailable,
+  getActiveCalls 
+} from '@services/CallKeepService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const AppContent = () => {
+  const appState = useRef<AppStateStatus>(AppState.currentState);
+  const callHandlersRegistered = useRef(false);
+
   useEffect(() => {
     createNotificationChannel();
   }, []);
@@ -43,7 +52,7 @@ const AppContent = () => {
         break;
       case 'follow':
         navigationRef.navigate('ProfileComp', {
-          userID: data?.userId,
+          userID: modalData.data.userId,
         });
         break;
       case 'incoming_call':
@@ -88,104 +97,190 @@ const AppContent = () => {
   }, []);
 
   useEffect(() => {
+    const handleAppStateChange = async (nextAppState: string) => {
+      console.log('[AppContent] App state changing from', appState.current, 'to', nextAppState);
+      
+      if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
+        console.log('[AppContent] App came to foreground');
+        
+        try {
+          const activeCalls = await getActiveCalls();
+          console.log('[AppContent] Active calls on foreground:', activeCalls);
+          
+          const activeCallUuid = await AsyncStorage.getItem('active_call_uuid');
+          if (activeCallUuid) {
+            console.log('[AppContent] Found active call UUID on foreground:', activeCallUuid);
+          }
+        } catch (err) {
+          console.warn('[AppContent] Error checking active calls:', err);
+        }
+      }
+      
+      appState.current = nextAppState as AppStateStatus;
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => subscription?.remove();
+  }, []);
+
+  useEffect(() => {
     const initializeCallKeep = async () => {
       try {
-        await setupCallKeep();
+        console.log('[AppContent] Initializing CallKeep...');
+        const success = await setupCallKeep();
+        console.log('[AppContent] CallKeep initialization result:', success);
       } catch (err) {
-        console.error('[App] CallKeep initialization failed:', err);
+        console.error('[AppContent] CallKeep initialization failed:', err);
       }
     };
 
     initializeCallKeep();
 
-    const onAnswer = async ({ callUUID }: { callUUID: string }) => {
-      console.log(`[CallKeep] Answer call: ${callUUID}`);
-      try {
-        const raw = await AsyncStorage.getItem(`incoming_call:${callUUID}`);
+    if (!callHandlersRegistered.current) {
+      console.log('[AppContent] Registering CallKeep event handlers...');
+      
+      const onAnswer = async ({ callUUID }: { callUUID: string }) => {
+        console.log(`[CallKeep] ✅ Native call ANSWERED: ${callUUID}`);
         
-        if (!raw || raw === 'undefined') {
-          console.log('[CallKeep] No valid call data found, ending call');
-          RNCallKeep.endCall(callUUID);
-          return;
-        }
-
-        let data;
         try {
-          data = JSON.parse(raw);
-        } catch (parseErr) {
-          console.error('[CallKeep] Failed to parse call data:', parseErr);
-          RNCallKeep.endCall(callUUID);
-          return;
-        }
-
-        console.log('[CallKeep] Retrieved call data:', data);
-
-        if (!data || !data.callId) {
-          console.log('[CallKeep] Invalid call data, ending call');
-          RNCallKeep.endCall(callUUID);
-          return;
-        }
-
-        // Navigate to call screen with CallKeep flags
-        const navigateToCall = () => {
-          if (navigationRef.isReady()) {
-            console.log('[CallKeep] Navigating to ZegoCallScreen...');
-            
-            navigationRef.navigate('ZegoCallScreen', {
-              userID: data.userId || 'unknown',
-              userName: data.userName || 'Unknown',
-              callID: data.callId,
-              image: data.image,
-              isCaller: false,
-              callType: data.callType || 'video',
-              answeredViaCallKeep: true, // Answered via CallKeep
-              callUUID: callUUID,
-              roomId: data.roomId || data.callId,
-            });
-          } else {
-            console.log('[CallKeep] Navigation not ready, retrying...');
-            setTimeout(navigateToCall, 100);
+          setCallActive(callUUID);
+          
+          // Retrieve stored call data
+          const rawCallData = await AsyncStorage.getItem(`incoming_call:${callUUID}`);
+          
+          if (!rawCallData || rawCallData === 'undefined') {
+            console.error('[CallKeep] No call data found for answered call, ending call');
+            endCall(callUUID);
+            return;
           }
-        };
 
-        setTimeout(navigateToCall, 300);
-        await AsyncStorage.removeItem(`incoming_call:${callUUID}`);
-      } catch (err) {
-        console.error('[CallKeep] answer handler error', err);
-        RNCallKeep.endCall(callUUID);
-      }
-    };
-
-    const onEnd = async ({ callUUID }: { callUUID: string }) => {
-      console.log(`[CallKeep] End call: ${callUUID}`);
-      try {
-        // Get call data before cleanup
-        const raw = await AsyncStorage.getItem(`incoming_call:${callUUID}`);
-        if (raw && raw !== 'undefined') {
+          let callData;
           try {
-            const data = JSON.parse(raw);
-            
-            // Use global socket to emit call declined
-            console.log('[CallKeep] Call was declined/ended via CallKeep for room:', data.roomId);
+            callData = JSON.parse(rawCallData);
           } catch (parseErr) {
-            console.error('[CallKeep] Failed to parse call data for decline notification:', parseErr);
+            console.error('[CallKeep] Failed to parse call data:', parseErr);
+            endCall(callUUID);
+            return;
           }
+
+          console.log('[CallKeep] Retrieved call data for answered call:', callData);
+
+          if (!callData || !callData.callId) {
+            console.error('[CallKeep] Invalid call data structure, ending call');
+            endCall(callUUID);
+            return;
+          }
+
+          const navigateToCall = () => {
+            if (navigationRef.isReady()) {
+              console.log('[CallKeep] 📱 Navigating to ZegoCallScreen from answered native call...');
+              
+              const navigationParams = {
+                userID: callData.userId || 'unknown',
+                userName: callData.userName || 'Unknown',
+                callID: callData.callId,
+                image: callData.image,
+                isCaller: false,
+                callType: callData.callType || 'video',
+                answeredViaCallKeep: true,
+                callUUID: callUUID,
+                roomId: callData.roomId || callData.callId,
+                fromNativeCall: true,
+              };
+              
+              console.log('[CallKeep] Navigation params:', navigationParams);
+              navigationRef.navigate('ZegoCallScreen', navigationParams);
+              
+            } else {
+              console.log('[CallKeep] Navigation not ready, retrying in 100ms...');
+              setTimeout(navigateToCall, 100);
+            }
+          };
+
+          setTimeout(navigateToCall, 300);
+          
+          await AsyncStorage.removeItem(`incoming_call:${callUUID}`);
+          await AsyncStorage.removeItem('active_call_uuid');
+          
+          console.log('[CallKeep] Call answer handling completed successfully');
+          
+        } catch (err) {
+          console.error('[CallKeep] Critical error in answer handler:', err);
+          endCall(callUUID);
         }
+      };
+
+      const onEnd = async ({ callUUID }: { callUUID: string }) => {
+        console.log(`[CallKeep] ❌ Native call ENDED/DECLINED: ${callUUID}`);
         
-        await AsyncStorage.removeItem(`incoming_call:${callUUID}`);
-      } catch (err) {
-        console.error('[CallKeep] Error cleaning up call data:', err);
-      }
-    };
+        try {
+          const rawCallData = await AsyncStorage.getItem(`incoming_call:${callUUID}`);
+          if (rawCallData && rawCallData !== 'undefined') {
+            try {
+              const callData = JSON.parse(rawCallData);
+              console.log('[CallKeep] Call was declined/ended for room:', callData.roomId);
+              
+            } catch (parseErr) {
+              console.error('[CallKeep] Failed to parse call data for decline notification:', parseErr);
+            }
+          }
+          
+          await AsyncStorage.removeItem(`incoming_call:${callUUID}`);
+          await AsyncStorage.removeItem('active_call_uuid');
+          
+          console.log('[CallKeep] Call end cleanup completed');
+          
+        } catch (err) {
+          console.error('[CallKeep] Error in end call handler:', err);
+        }
+      };
 
-    // Event listeners
-    const answerSubscription = RNCallKeep.addEventListener('answerCall', onAnswer);
-    const endSubscription = RNCallKeep.addEventListener('endCall', onEnd);
+      const onDidActivateAudioSession = () => {
+        console.log('[CallKeep] 🔊 Audio session activated - call is ready');
+      };
 
-    return () => {
-      answerSubscription?.remove?.();
-      endSubscription?.remove?.();
-    };
+      const onDidDeactivateAudioSession = () => {
+        console.log('[CallKeep] 🔇 Audio session deactivated - call ended');
+      };
+
+      const onDidDisplayIncomingCall = ({ callUUID }: { callUUID: string }) => {
+        console.log(`[CallKeep] 📱 Native incoming call UI displayed: ${callUUID}`);
+      };
+
+      const onShowIncomingCallUi = ({ callUUID }: { callUUID: string }) => {
+        console.log(`[CallKeep] 📱 Native incoming call UI shown: ${callUUID}`);
+      };
+
+      const onPerformSetMutedCallAction = ({ callUUID, muted }: { callUUID: string, muted: boolean }) => {
+        console.log(`[CallKeep] 🎤 Call ${muted ? 'muted' : 'unmuted'}: ${callUUID}`);
+      };
+
+      const subscriptions = [
+        RNCallKeep.addEventListener('answerCall', onAnswer),
+        RNCallKeep.addEventListener('endCall', onEnd),
+        RNCallKeep.addEventListener('didActivateAudioSession', onDidActivateAudioSession),
+        RNCallKeep.addEventListener('didDeactivateAudioSession', onDidDeactivateAudioSession),
+        RNCallKeep.addEventListener('didDisplayIncomingCall', onDidDisplayIncomingCall),
+        RNCallKeep.addEventListener('showIncomingCallUi', onShowIncomingCallUi),
+        RNCallKeep.addEventListener('didPerformSetMutedCallAction', onPerformSetMutedCallAction),
+      ];
+
+      callHandlersRegistered.current = true;
+      console.log('[AppContent] CallKeep event handlers registered successfully');
+
+      // Cleanup function
+      return () => {
+        console.log('[AppContent] Cleaning up CallKeep event handlers...');
+        subscriptions.forEach(sub => {
+          try {
+            sub?.remove?.();
+          } catch (err) {
+            console.warn('[AppContent] Error removing CallKeep subscription:', err);
+          }
+        });
+        callHandlersRegistered.current = false;
+      };
+    }
   }, []);
 
   return (
