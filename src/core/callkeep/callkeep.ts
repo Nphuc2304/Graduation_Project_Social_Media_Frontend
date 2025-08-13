@@ -1,15 +1,16 @@
 import RNCallKeep, {IOptions} from 'react-native-callkeep';
 import 'react-native-get-random-values';
+import {navigationRef} from '../../../src/NavigationService';
 import {v4 as uuidv4} from 'uuid';
 
 const options: IOptions = {
   ios: {appName: 'YourApp', supportsVideo: true},
   android: {
-	  alertTitle: 'Quyền gọi',
-	  alertDescription: 'Ứng dụng cần quyền để hiển thị cuộc gọi.',
-	  cancelButton: 'Huỷ',
-	  okButton: 'OK',
-	  additionalPermissions: []
+    alertTitle: 'Quyền gọi',
+    alertDescription: 'Ứng dụng cần quyền để hiển thị cuộc gọi.',
+    cancelButton: 'Huỷ',
+    okButton: 'OK',
+    additionalPermissions: [],
   },
 };
 
@@ -22,13 +23,19 @@ export async function setupCallKeep() {
 
   // Listeners
   RNCallKeep.addEventListener('answerCall', ({callUUID}) => {
-    // TODO: bắt đầu kết nối audio/WebRTC ở đây
-    // ví dụ: startWebRTC(callUUID)
+    navigationRef.current?.navigate('ZegoCallScreen', {
+      callUUID,
+      isIncoming: true,
+    });
   });
 
   RNCallKeep.addEventListener('endCall', ({callUUID}) => {
-    // TODO: dọn kết nối audio/WebRTC
-    // ví dụ: stopWebRTC(callUUID)
+    if (navigationRef.current?.canGoBack()) {
+      navigationRef.current.goBack();
+    } else {
+      navigationRef.current?.navigate('BottomTabs');
+    }
+    RNCallKeep.endCall(callUUID);
   });
 
   RNCallKeep.addEventListener(
@@ -52,13 +59,7 @@ export function showIncomingCall({
   handle?: string;
   hasVideo?: boolean;
 }) {
-  RNCallKeep.displayIncomingCall(
-    uuid,
-    handle,
-    callerName,
-    'generic',
-    hasVideo,
-  );
+  RNCallKeep.displayIncomingCall(uuid, handle, callerName, 'generic', hasVideo);
   return uuid;
 }
 
