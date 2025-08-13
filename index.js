@@ -1,20 +1,23 @@
-/**
- * @format
- */
-
 import {AppRegistry} from 'react-native';
 import App from './src/App';
 import {name as appName} from './app.json';
 import messaging from '@react-native-firebase/messaging';
-import { showIncomingCall, setupCallKeep } from './services/CallKeepService';
+import notifee, {EventType} from '@notifee/react-native';
+import {showIncomingCall, setupCallKeep} from './services/CallKeepService';
 
-AppRegistry.registerComponent(appName, () => App);
+// Handler nền cho Notifee
+notifee.onBackgroundEvent(async ({type, detail}) => {
+  if (type === EventType.ACTION_PRESS) {
+    // Xử lý khi bấm action
+  }
+  if (type === EventType.DISMISSED) {
+    // Xử lý khi dismiss
+  }
+});
 
-// Background message handler
+// Handler nền cho FCM
 messaging().setBackgroundMessageHandler(async remoteMessage => {
-  // CallKeep cần được setup trước khi displayIncomingCall
   await setupCallKeep();
-
   if (remoteMessage?.data?.type === 'incoming_call') {
     showIncomingCall({
       callerName: remoteMessage.data.callerName ?? 'Caller',
@@ -23,3 +26,5 @@ messaging().setBackgroundMessageHandler(async remoteMessage => {
     });
   }
 });
+
+AppRegistry.registerComponent(appName, () => App);

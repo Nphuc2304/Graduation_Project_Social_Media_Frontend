@@ -14,6 +14,9 @@ import {Colors} from '@assets/color/Colors';
 import {User} from '@services/userRedux/userTypes';
 import {useSocket} from '@services/SocketContext';
 import {useNavigation} from '@react-navigation/native';
+import RNCallKeep from 'react-native-callkeep';
+import 'react-native-get-random-values';
+import {v4 as uuidv4} from 'uuid';
 
 interface MessageItemProps {
   roomId: string;
@@ -52,19 +55,36 @@ const MessageItemComponent: React.FC<MessageItemProps> = memo(
     const navigation = useNavigation<any>();
 
     const handleReCall = useCallback(() => {
+      if (!userC || !roomId) return;
+
+      const callUUID = uuidv4();
+
+      // Hiển thị UI gọi ra của CallKeep
+      RNCallKeep.startCall(
+        callUUID,
+        userC.username ?? 'Người nhận',
+        userC.username ?? 'Người nhận',
+        'number',
+        false, // voice call
+      );
+
+      // Gửi tín hiệu tới bên kia
       if (socket) {
         socket.emit('incomingCall', {
-          callerName: userC?.username,
+          callerName: userC.username,
           type: 'voice',
           roomId,
+          callUUID,
         });
       }
+
+      // Điều hướng ngay nếu muốn
       navigation.navigate('ZegoCallScreen', {
-        userID: userC?._id,
-        userName: userC?.username,
+        userID: userC._id,
+        userName: userC.username,
         callID: roomId,
         callType: 'voice',
-        image: userC?.profilePic,
+        image: userC.profilePic,
         isCaller: true,
       });
     }, [socket, userC, roomId, navigation]);

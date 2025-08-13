@@ -1,5 +1,5 @@
 import RNCallKeep, {IOptions} from 'react-native-callkeep';
-import {Platform} from 'react-native';
+import 'react-native-get-random-values';
 import {v4 as uuidv4} from 'uuid';
 
 const options: IOptions = {
