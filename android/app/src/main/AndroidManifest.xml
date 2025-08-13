@@ -84,14 +84,13 @@
         </intent-filter>
       </activity>
 
-      <service
-        android:name="io.wazo.callkeep.VoiceConnectionService"
-        android:permission="android.permission.BIND_TELECOM_CONNECTION_SERVICE"
-        android:exported="true"
-        android:enabled="true">
-        <intent-filter>
-          <action android:name="android.telecom.ConnectionService" />
-        </intent-filter>
+      <service android:name="com.wazo.callkeep.VoiceConnectionService"
+          android:label="CallKeep"
+          android:permission="android.permission.BIND_TELECOM_CONNECTION_SERVICE"
+          android:exported="true">
+          <intent-filter>
+              <action android:name="android.telecom.ConnectionService" />
+          </intent-filter>
       </service>
 
       <service

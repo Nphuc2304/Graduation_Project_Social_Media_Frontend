@@ -77,3 +77,7 @@ export async function checkInitialNotification(
     callback(remoteMessage);
   }
 }
+
+export function isIncomingCallMessage(remoteMessage: any) {
+  return remoteMessage?.data?.type === 'incoming_call';
+}
