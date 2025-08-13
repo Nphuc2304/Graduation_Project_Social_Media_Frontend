@@ -4,15 +4,29 @@ import {
   onMessageListener,
   onNotificationOpenedApp,
 } from './notification';
-import { AppDispatch } from '@services/store';
-import { setIsReadNoti } from '@services/notificationRedux/notificationReducer';
-import { useDispatch } from 'react-redux';
+import {AppDispatch} from '@services/store';
+import {setIsReadNoti} from '@services/notificationRedux/notificationReducer';
+import {useDispatch} from 'react-redux';
+import {
+  setupCallKeep,
+  showIncomingCall,
+} from '../../src/core/callkeep/callkeep';
 
 export const useNotificationHandler = (onNavigate: (data: any) => void) => {
   const [modalData, setModalData] = useState<any | null>(null);
   const dispatch = useDispatch<AppDispatch>();
 
-  const handleMessage = useCallback((remoteMessage: any) => {
+  const handleMessage = useCallback(async (remoteMessage: any) => {
+    if (remoteMessage?.data?.type === 'incoming_call') {
+      await setupCallKeep();
+      showIncomingCall({
+        callerName: remoteMessage.data.callerName ?? 'Caller',
+        handle: remoteMessage.data.handle ?? 'number',
+        hasVideo: remoteMessage.data.hasVideo === 'true',
+      });
+      return; // không show modal nữa
+    }
+
     setModalData({
       title: remoteMessage.notification?.title,
       body: remoteMessage.notification?.body,
@@ -22,7 +36,17 @@ export const useNotificationHandler = (onNavigate: (data: any) => void) => {
   }, []);
 
   const handleNavigate = useCallback(
-    (remoteMessage: any) => {
+    async (remoteMessage: any) => {
+      if (remoteMessage?.data?.type === 'incoming_call') {
+        await setupCallKeep();
+        showIncomingCall({
+          callerName: remoteMessage.data.callerName ?? 'Caller',
+          handle: remoteMessage.data.handle ?? 'number',
+          hasVideo: remoteMessage.data.hasVideo === 'true',
+        });
+        return;
+      }
+
       if (remoteMessage?.data) {
         onNavigate(remoteMessage.data);
         dispatch(setIsReadNoti(false));

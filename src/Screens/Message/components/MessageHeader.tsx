@@ -17,6 +17,9 @@ import {useTheme} from '../../../../src/util/ThemeContext';
 import CustomPopupModal, {
   CustomPopupModalRef,
 } from '../../../../components/Global/CustomPopupModal';
+import 'react-native-get-random-values';
+import RNCallKeep from 'react-native-callkeep';
+import {v4 as uuidv4} from 'uuid';
 
 interface MessageHeaderProps {
   user1?: RoomUser;
@@ -43,75 +46,90 @@ const MessageHeader: React.FC<MessageHeaderProps> = ({
   const color = Colors[theme];
   const {socket} = useSocket();
   const modalRef = useRef<CustomPopupModalRef>(null);
+
   const [incomingCall, setIncomingCall] = useState({
     visible: false,
     callerName: '',
     type: 'video' as 'video' | 'voice',
+    callUUID: '',
   });
+
   const rejectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Gọi ra video
   const handleCall = () => {
     if (!room?._id || !userC) return;
-
-    // Add haptic feedback
     Vibration.vibrate(50);
 
-    if (socket) {
-      socket.emit('incomingCall', {
-        callerName: userC.username,
-        type: 'video',
-        roomId: room._id,
-      });
-    }
+    const callUUID = uuidv4();
 
-    navigation.navigate('ZegoCallScreen', {
-      userID: userC._id,
-      userName: userC.username,
-      callID: room._id,
-      callType: 'video',
-      image: userC.profilePic,
-      isCaller: true,
+    RNCallKeep.startCall(
+      callUUID,
+      user1?.username ?? 'Người nhận',
+      user1?.username ?? 'Người nhận',
+      'number',
+      true, // Video
+    );
+
+    socket?.emit('incomingCall', {
+      callerName: userC.username,
+      type: 'video',
+      roomId: room._id,
+      callUUID,
     });
   };
 
+  // Gọi ra voice
   const handleVoiceCall = () => {
     if (!room?._id || !userC) return;
-
-    // Add haptic feedback
     Vibration.vibrate(50);
 
-    if (socket) {
-      socket.emit('incomingCall', {
-        callerName: userC.username,
-        type: 'voice',
-        roomId: room._id,
-      });
-    }
+    const callUUID = uuidv4();
 
-    navigation.navigate('ZegoCallScreen', {
-      userID: userC._id,
-      userName: userC.username,
-      callID: room._id,
-      image: userC.profilePic,
-      callType: 'voice',
-      isCaller: true,
+    RNCallKeep.startCall(
+      callUUID,
+      user1?.username ?? 'Người nhận',
+      user1?.username ?? 'Người nhận',
+      'number',
+      false,
+    );
+
+    socket?.emit('incomingCall', {
+      callerName: userC.username,
+      type: 'voice',
+      roomId: room._id,
+      callUUID,
     });
   };
 
+  // Nhận tín hiệu gọi đến
   useEffect(() => {
     if (!socket) return;
 
     const onIncoming = ({
       callerName,
       type,
+      callUUID,
     }: {
       callerName: string;
       type: 'video' | 'voice';
+      callUUID: string;
     }) => {
+      // Bật UI gọi native
+      RNCallKeep.displayIncomingCall(
+        callUUID,
+        callerName || 'Không xác định',
+        callerName || 'Không xác định',
+        'number',
+        type === 'video',
+      );
+
+      // Hiển thị modal custom
       setIncomingCall({
         visible: true,
         callerName,
         type,
+        callUUID,
       });
     };
 
@@ -121,8 +139,11 @@ const MessageHeader: React.FC<MessageHeaderProps> = ({
     };
   }, [socket]);
 
+  // Chấp nhận cuộc gọi
   const handleAcceptCall = () => {
     if (rejectTimeoutRef.current) clearTimeout(rejectTimeoutRef.current);
+
+    RNCallKeep.answerIncomingCall(incomingCall.callUUID);
     setIncomingCall(prev => ({...prev, visible: false}));
 
     navigation.navigate('ZegoCallScreen', {
@@ -130,31 +151,36 @@ const MessageHeader: React.FC<MessageHeaderProps> = ({
       userName: userC?.username,
       callID: room?._id,
       image: userC?.profilePic,
+      callType: incomingCall.type,
+      isCaller: false,
     });
   };
 
+  // Từ chối cuộc gọi
   const handleRejectCall = () => {
     if (rejectTimeoutRef.current) clearTimeout(rejectTimeoutRef.current);
-    if (socket) {
-      socket.emit('callCancelled', {
-        roomId: room?._id,
-        senderId: userC?._id,
-      });
-    }
+    RNCallKeep.endCall(incomingCall.callUUID);
+
+    socket?.emit('callCancelled', {
+      roomId: room?._id,
+      senderId: userC?._id,
+    });
+
     setIncomingCall(prev => ({...prev, visible: false}));
   };
 
+  // Auto reject sau 10s
   useEffect(() => {
     if (incomingCall.visible) {
       rejectTimeoutRef.current = setTimeout(() => {
         handleRejectCall();
       }, 10000);
     }
-
     return () => {
       if (rejectTimeoutRef.current) clearTimeout(rejectTimeoutRef.current);
     };
   }, [incomingCall.visible]);
+
   const shouldShowCallIcons =
     showCallFeatures && room?.type != 'waiting' && userC;
 
@@ -173,15 +199,13 @@ const MessageHeader: React.FC<MessageHeaderProps> = ({
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[
-              {
-                width: '100%',
-                flexDirection: 'row',
-                alignItems: 'center',
-                paddingHorizontal: 10,
-                gap: 10,
-              },
-            ]}
+            style={{
+              width: '100%',
+              flexDirection: 'row',
+              alignItems: 'center',
+              paddingHorizontal: 10,
+              gap: 10,
+            }}
             onPress={() => {
               if (user1?.profilePic && user2?.profilePic) {
                 navigation.navigate('InforGroupChat', {
@@ -264,8 +288,7 @@ const MessageHeader: React.FC<MessageHeaderProps> = ({
 
       <CustomPopupModal
         ref={modalRef}
-        title={undefined}
-        showCancelButton={true}
+        showCancelButton
         cancelText="Huỷ"
         cancelTextColor="#007AFF"
         onCancel={() => modalRef.current?.close()}>
@@ -355,13 +378,5 @@ const styles = StyleSheet.create({
   destructiveText: {
     fontSize: 18,
     fontWeight: '600',
-  },
-  callButton: {
-    padding: 10,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minWidth: 44,
-    minHeight: 44,
   },
 });
