@@ -20,7 +20,6 @@ import searchPostReducer from '../SearchPost/searchPostReducer';
 import notificationReducer from '../notificationRedux/notificationReducer';
 import reportUserReducer from '../reportUserRedux/reportUserReducer'
 import ChatAIReducer from '../ChatAIRedux/ChatAIReducer';
-import ReportPost from '../reportPost/reportRedux';
 
 const persistUserConfig = {
   key: 'user',

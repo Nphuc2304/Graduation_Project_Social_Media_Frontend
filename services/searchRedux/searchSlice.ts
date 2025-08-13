@@ -1,43 +1,51 @@
-import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
-import { RootState } from '../store';
-import { 
-  ReqSearch, 
-  ReqSearchUser, 
-  ResSearchPost, 
-  ResSearchUser, 
-  SearchState 
-} from "./searchType";
-import axiosInstance from "../axiosInstance";
-import { API } from "../api";
+import {createSlice, createAsyncThunk} from '@reduxjs/toolkit';
+import {RootState} from '../store';
+import {
+  Post,
+  PostS,
+  ReqSearch,
+  ReqSearchUser,
+  ResSearchPost,
+  ResSearchUser,
+  SearchState,
+} from './searchType';
+import axiosInstance from '../axiosInstance';
+import {API} from '../api';
 
 const initialState: SearchState = {
   posts: undefined,
   users: undefined,
   isLoading: false,
   isError: false,
-  errorMessage: undefined
+  errorMessage: undefined,
 };
 
 export const fetchSearchPost = createAsyncThunk<
   ResSearchPost,
   ReqSearch,
-  { rejectValue: { message: string } }
+  {rejectValue: {message: string}}
 >(
   'search/fetchPosts',
-  async ({ refreshToken, keyword }, { rejectWithValue, signal }) => {
+  async ({refreshToken, keyword}, {rejectWithValue, signal}) => {
     try {
-      const res = await axiosInstance.post(API.POST_SEARCH_POST, { keyword }, {
-        headers: {
-          Authorization: `Bearer ${refreshToken}`,
+      const res = await axiosInstance.post(
+        API.POST_SEARCH_POST,
+        {keyword},
+        {
+          headers: {
+            Authorization: `Bearer ${refreshToken}`,
+          },
+          signal, // Add abort signal for cleanup
         },
-        signal // Add abort signal for cleanup
-      });
+      );
       return res.data;
     } catch (error: any) {
       if (error.name === 'AbortError') {
-        return rejectWithValue({ message: 'Search cancelled' });
+        return rejectWithValue({message: 'Search cancelled'});
       }
-      return rejectWithValue({ message: error?.response?.data?.message || 'Tìm kiếm thất bại.' })
+      return rejectWithValue({
+        message: error?.response?.data?.message || 'Tìm kiếm thất bại.',
+      });
     }
   },
 );
@@ -45,48 +53,79 @@ export const fetchSearchPost = createAsyncThunk<
 export const fetchSearchUser = createAsyncThunk<
   ResSearchUser,
   ReqSearchUser,
-  { rejectValue: { message: string } }
+  {rejectValue: {message: string}}
 >(
   'search/fetchUsers',
-  async ({ refreshToken, keyword, mode }, { rejectWithValue, signal }) => {
+  async ({refreshToken, keyword, mode}, {rejectWithValue, signal}) => {
     try {
-      const res = await axiosInstance.post(API.POST_SEARCH_USER, {
-        keyword, mode
-      }, {
-        headers: {
-          Authorization: `Bearer ${refreshToken}`,
+      const res = await axiosInstance.post(
+        API.POST_SEARCH_USER,
+        {
+          keyword,
+          mode,
         },
-        signal // Add abort signal for cleanup
-      });
+        {
+          headers: {
+            Authorization: `Bearer ${refreshToken}`,
+          },
+          signal, // Add abort signal for cleanup
+        },
+      );
       return res.data;
     } catch (error: any) {
       if (error.name === 'AbortError') {
-        return rejectWithValue({ message: 'Search cancelled' });
+        return rejectWithValue({message: 'Search cancelled'});
       }
-      return rejectWithValue({ message: error?.response?.data?.message || 'Tìm kiếm thất bại.' })
+      return rejectWithValue({
+        message: error?.response?.data?.message || 'Tìm kiếm thất bại.',
+      });
     }
   },
 );
+
+export const getSimilarPost = createAsyncThunk<
+  PostS,
+  {postId: string; page?: number},
+  {rejectValue: {message: string}}
+>('search/posts/similar', async ({postId, page = 1}, {rejectWithValue}) => {
+  try {
+    const res = await axiosInstance.get(
+      `${API.GET_SIMILAR_POST}/${postId}/similar`,
+      {
+        params: {page},
+        headers: {
+          token: 'refresh',
+        },
+      },
+    );
+    return res.data;
+  } catch (error: any) {
+    return rejectWithValue({
+      message:
+        error?.response?.data?.message || 'Lấy danh sách bài viết thất bại.',
+    });
+  }
+});
 
 const searchSlice = createSlice({
   name: 'search',
   initialState,
   reducers: {
     // ADD CLEANUP ACTIONS
-    clearSearchResults: (state) => {
+    clearSearchResults: state => {
       state.posts = undefined;
       state.users = undefined;
       state.isError = false;
       state.errorMessage = undefined;
     },
     resetSearchState: () => initialState,
-    cancelSearch: (state) => {
+    cancelSearch: state => {
       state.isLoading = false;
-    }
+    },
   },
-  extraReducers: (builder) => {
+  extraReducers: builder => {
     builder
-      .addCase(fetchSearchPost.pending, (state) => {
+      .addCase(fetchSearchPost.pending, state => {
         state.isLoading = true;
         state.isError = false;
         state.errorMessage = undefined;
@@ -102,7 +141,7 @@ const searchSlice = createSlice({
           state.errorMessage = action.payload?.message;
         }
       })
-      .addCase(fetchSearchUser.pending, (state) => {
+      .addCase(fetchSearchUser.pending, state => {
         state.isLoading = true;
         state.isError = false;
         state.errorMessage = undefined;
@@ -118,8 +157,9 @@ const searchSlice = createSlice({
           state.errorMessage = action.payload?.message;
         }
       });
-  }
+  },
 });
 
-export const { clearSearchResults, resetSearchState, cancelSearch } = searchSlice.actions;
+export const {clearSearchResults, resetSearchState, cancelSearch} =
+  searchSlice.actions;
 export default searchSlice.reducer;
