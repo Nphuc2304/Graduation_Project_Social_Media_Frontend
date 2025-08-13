@@ -157,7 +157,7 @@ const MessageItemComponent: React.FC<MessageItemProps> = memo(
                   }}>
                   <Text
                     style={{
-                      color: '#ffffff',
+                      color: color.text,
                       fontSize: 12,
                       lineHeight: 16,
                       fontWeight: '400',

@@ -18,6 +18,7 @@ export const API = {
   GET_LIKED_POSTS: 'post-like/liked-posts',
   DELETE_MY_POST: 'posts/delete',
   POSR_REPORT_POST: 'report-contents/report',
+  GET_SIMILAR_POST: 'posts',
 
   //// comment
   COMMENT: 'comments',
