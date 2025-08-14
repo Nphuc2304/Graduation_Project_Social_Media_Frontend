@@ -80,7 +80,7 @@ export const RenderMediaItem = React.memo(
     return (
       <View style={{width: screenWidth, height: item.videoUrl ? 600 : 520}}>
         {item.videoUrl ? (
-          <TouchableOpacity onPress={handleVideoPress}>
+          <TouchableOpacity onPress={handleVideoPress} activeOpacity={1}>
             <View style={{position: 'relative'}}>
               <LinearGradient
                 colors={['rgba(0,0,0,0.7)', 'transparent']}
@@ -112,6 +112,7 @@ export const RenderMediaItem = React.memo(
           </TouchableOpacity>
         ) : (
           <TouchableOpacity
+            activeOpacity={1}
             onPress={() => {
               if (setSelectedImageUri) setSelectedImageUri(item.imageUrl ?? '');
             }}>

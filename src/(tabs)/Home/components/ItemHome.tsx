@@ -97,6 +97,11 @@ const ItemHome = (props: ItemHomeProps) => {
 
   // music
   useItemHomeAudio(props, muted);
+  const hasMusic = useMemo(() => {
+    const hasMusicInfo = musicInfo && Object.keys(musicInfo).length > 0;
+    const hasMusicData = music && Object.keys(music).length > 0;
+    return hasMusicInfo || hasMusicData;
+  }, [musicInfo, music]);
 
   // Modal ref
   const optionSheetRef = useRef<CustomBottomSheetOptionsRef>(null);
@@ -435,7 +440,7 @@ const ItemHome = (props: ItemHomeProps) => {
         <RenderMuteButton
           muted={muted}
           setMuted={setMuted}
-          isPostWithoutMusic={type === 'post' && !music}
+          isPostWithoutMusic={type === 'post' && !hasMusic}
         />
       </View>
 

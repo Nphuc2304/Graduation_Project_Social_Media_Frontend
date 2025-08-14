@@ -12,20 +12,36 @@ interface Props {
 const ImagePreviewModal: React.FC<Props> = ({visible, imageUri, onClose}) => {
   return (
     <Modal visible={visible} transparent={true}>
-      <View style={styles.overlay}>
-        <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-          <X size={26} color={Colors.white} />
+      <TouchableOpacity 
+        style={styles.overlay} 
+        activeOpacity={1} 
+        onPress={onClose}
+      >
+        {/* Close button */}
+        <TouchableOpacity 
+          style={styles.closeButton} 
+          onPress={onClose}
+          activeOpacity={0.8}
+        >
+          <View style={styles.closeButtonBackground}>
+            <X size={26} color={Colors.white} />
+          </View>
         </TouchableOpacity>
+        
         {imageUri && (
-          <View style={styles.imageContainer}>
+          <TouchableOpacity 
+            style={styles.imageContainer}
+            activeOpacity={1}
+            onPress={(e) => e.stopPropagation()}
+          >
             <Image
               source={{uri: imageUri}}
               style={styles.image}
-              resizeMode="cover"
+              resizeMode="contain"
             />
-          </View>
+          </TouchableOpacity>
         )}
-      </View>
+      </TouchableOpacity>
     </Modal>
   );
 };
@@ -35,7 +51,7 @@ export default ImagePreviewModal;
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -44,7 +60,13 @@ const styles = StyleSheet.create({
     top: '8%',
     right: '5%',
     zIndex: 1,
-    color: Colors.white,
+  },
+  closeButtonBackground: {
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 20,
+    padding: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   imageContainer: {
     width: '90%',
