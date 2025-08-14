@@ -974,23 +974,29 @@ export const SeenStory = ({route, navigation}: any) => {
     // ✅ Normalize tags: backend may send either { user: UserMini } or { user: string, handleName/username }
     const normalizedMentionData = (tags || [])
       .map((tag: any) => {
-        // If tag.user is an object with username, use it; else use flat properties
-        if (tag && typeof tag === 'object') {
-          if (tag.user && typeof tag.user === 'object') {
-            return {
-              username: tag.user.username,
-              handleName: tag.user.handleName,
-              _id: tag.user._id,
-            };
-          }
-          // tag.user may be an id string and separate handleName/username are at root
-          return {
-            username: tag.username,
-            handleName: tag.handleName,
-            _id: tag.user,
-          };
-        }
-        return null;
+        if (!tag || typeof tag !== 'object') return null;
+        const originalUser = typeof tag.user === 'object' ? tag.user : undefined;
+        const userId = originalUser?._id || (typeof tag.user === 'string' ? tag.user : undefined);
+        const originalUsername = originalUser?.username || tag?.username;
+        const originalHandleName = originalUser?.handleName || tag?.handleName;
+        if (!userId) return null;
+
+        const latest = followingUsers.find(u => u._id === userId);
+        const latestUsername = latest?.username || originalUsername;
+        const latestHandleName = latest?.handleName || originalHandleName;
+        const aliases = Array.from(
+          new Set([
+            originalUsername || '',
+            originalHandleName || '',
+          ].filter(Boolean))
+        );
+
+        return {
+          _id: userId,
+          username: latestUsername,
+          handleName: latestHandleName,
+          aliases,
+        };
       })
       .filter(Boolean);
 

@@ -4,6 +4,7 @@ import { Text, TouchableOpacity } from 'react-native';
 interface MentionData {
   username?: string;
   handleName?: string; // backward compatibility
+  aliases?: string[]; // previous usernames/handles to keep backward compatibility
   _id: string;
 }
 
@@ -45,16 +46,19 @@ export const renderTextWithMentions = (
     const mention = match[0]; // @username
     const mentionName = match[1]; // username without @
 
-    // Find user data by username first, fallback to handleName
+    // Find user data by username/handleName or any alias (old username/handle)
     const lower = mentionName.toLowerCase();
     const userData = mentionData.find(user => {
       const u = (user.username || '').toLowerCase();
       const h = (user.handleName || '').toLowerCase();
-      return (u && u === lower) || (h && h === lower);
+      const aliases = (user.aliases || []).map(a => (a || '').toLowerCase());
+      return (u && u === lower) || (h && h === lower) || aliases.includes(lower);
     });
 
     if (userData) {
       // Clickable mention using Text to keep typography identical
+      // Display the latest username/handle when available instead of the raw text
+      const latestName = userData.username || userData.handleName || mentionName;
       parts.push(
         <Text
           key={key++}
@@ -62,7 +66,7 @@ export const renderTextWithMentions = (
           style={[baseTextStyle, mentionStyle, { color: '#4A90E2' }]}
           suppressHighlighting
         >
-          {mention}
+          {`@${latestName}`}
         </Text>
       );
     } else {
