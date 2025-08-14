@@ -47,75 +47,92 @@ const MessageHeader: React.FC<MessageHeaderProps> = ({
   const {socket} = useSocket();
   const modalRef = useRef<CustomPopupModalRef>(null);
 
-  const [incomingCall, setIncomingCall] = useState({
+  const [incomingCall, setIncomingCall] = useState<{
+    visible: boolean;
+    callerId: string;
+    callerName: string;
+    callerAvatar?: string;
+    type: 'video' | 'voice';
+    callUUID: string;
+    roomId: string;
+  }>({
     visible: false,
+    callerId: '',
     callerName: '',
-    type: 'video' as 'video' | 'voice',
+    callerAvatar: undefined,
+    type: 'video',
     callUUID: '',
+    roomId: '',
   });
 
   const rejectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Gọi ra video
   const handleCall = () => {
-    if (!room?._id || !userC) return;
+    if (!room?._id || !userC || !user1) return;
     Vibration.vibrate(50);
 
     const callUUID = uuidv4();
 
     RNCallKeep.startCall(
       callUUID,
-      user1?.username ?? 'Người nhận',
-      user1?.username ?? 'Người nhận',
+      user1.username ?? 'Người nhận',
+      user1.username ?? 'Người nhận',
       'number',
-      true, // Video
+      true,
     );
 
     socket?.emit('incomingCall', {
+      callerId: userC._id,
       callerName: userC.username,
+      callerAvatar: userC.profilePic,
       type: 'video',
       roomId: room._id,
       callUUID,
     });
   };
 
-  // Gọi ra voice
   const handleVoiceCall = () => {
-    if (!room?._id || !userC) return;
+    if (!room?._id || !userC || !user1) return;
     Vibration.vibrate(50);
 
     const callUUID = uuidv4();
 
     RNCallKeep.startCall(
       callUUID,
-      user1?.username ?? 'Người nhận',
-      user1?.username ?? 'Người nhận',
+      user1.username ?? 'Người nhận',
+      user1.username ?? 'Người nhận',
       'number',
       false,
     );
 
     socket?.emit('incomingCall', {
+      callerId: userC._id,
       callerName: userC.username,
+      callerAvatar: userC.profilePic,
       type: 'voice',
       roomId: room._id,
       callUUID,
     });
   };
 
-  // Nhận tín hiệu gọi đến
   useEffect(() => {
     if (!socket) return;
 
     const onIncoming = ({
+      callerId,
       callerName,
+      callerAvatar,
       type,
       callUUID,
+      roomId,
     }: {
+      callerId: string;
       callerName: string;
+      callerAvatar?: string;
       type: 'video' | 'voice';
       callUUID: string;
+      roomId: string;
     }) => {
-      // Bật UI gọi native
       RNCallKeep.displayIncomingCall(
         callUUID,
         callerName || 'Không xác định',
@@ -124,12 +141,14 @@ const MessageHeader: React.FC<MessageHeaderProps> = ({
         type === 'video',
       );
 
-      // Hiển thị modal custom
       setIncomingCall({
         visible: true,
+        callerId,
         callerName,
+        callerAvatar,
         type,
         callUUID,
+        roomId,
       });
     };
 
@@ -147,10 +166,10 @@ const MessageHeader: React.FC<MessageHeaderProps> = ({
     setIncomingCall(prev => ({...prev, visible: false}));
 
     navigation.navigate('ZegoCallScreen', {
-      userID: userC?._id,
-      userName: userC?.username,
-      callID: room?._id,
-      image: userC?.profilePic,
+      userID: incomingCall.callerId,
+      userName: incomingCall.callerName,
+      callID: incomingCall.roomId,
+      image: incomingCall.callerAvatar,
       callType: incomingCall.type,
       isCaller: false,
     });
