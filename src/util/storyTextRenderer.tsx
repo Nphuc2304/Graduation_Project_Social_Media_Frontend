@@ -2,7 +2,9 @@ import React from 'react';
 import { Text, TouchableOpacity } from 'react-native';
 
 interface MentionData {
-  handleName: string;
+  username?: string;
+  handleName?: string; // backward compatibility
+  aliases?: string[]; // previous usernames/handles to keep backward compatibility
   _id: string;
 }
 
@@ -17,6 +19,14 @@ export const renderTextWithMentions = (
     return <Text style={textStyle}></Text>;
   }
 
+  // Ensure a consistent line height between normal text and mentions
+  const baseFontSize = (textStyle && textStyle.fontSize) || 20;
+  const baseTextStyle = {
+    ...textStyle,
+    lineHeight:
+      (textStyle && textStyle.lineHeight) || Math.round(baseFontSize * 1.25),
+  };
+
   const mentionRegex = /@([a-zA-Z0-9._]+)/g;
   const parts: React.ReactNode[] = [];
   let lastIndex = 0;
@@ -27,38 +37,42 @@ export const renderTextWithMentions = (
     // Add text before the mention
     if (match.index > lastIndex) {
       parts.push(
-        <Text key={key++} style={textStyle}>
+        <Text key={key++} style={baseTextStyle}>
           {text.substring(lastIndex, match.index)}
         </Text>
       );
     }
 
     const mention = match[0]; // @username
-    const handleName = match[1]; // username without @
+    const mentionName = match[1]; // username without @
 
-    // Find user data by handleName
-    const userData = mentionData.find(user => 
-      user.handleName.toLowerCase() === handleName.toLowerCase()
-    );
+    // Find user data by username/handleName or any alias (old username/handle)
+    const lower = mentionName.toLowerCase();
+    const userData = mentionData.find(user => {
+      const u = (user.username || '').toLowerCase();
+      const h = (user.handleName || '').toLowerCase();
+      const aliases = (user.aliases || []).map(a => (a || '').toLowerCase());
+      return (u && u === lower) || (h && h === lower) || aliases.includes(lower);
+    });
 
     if (userData) {
-      // Clickable mention
+      // Clickable mention using Text to keep typography identical
+      // Display the latest username/handle when available instead of the raw text
+      const latestName = userData.username || userData.handleName || mentionName;
       parts.push(
-        <TouchableOpacity
+        <Text
           key={key++}
           onPress={() => onMentionPress(userData._id)}
-          activeOpacity={0.7}
-          style={{ flexDirection: 'row' }}
+          style={[baseTextStyle, mentionStyle, { color: '#4A90E2' }]}
+          suppressHighlighting
         >
-          <Text style={[textStyle, mentionStyle, { color: '#4A90E2' }]}>
-            {mention}
-          </Text>
-        </TouchableOpacity>
+          {`@${latestName}`}
+        </Text>
       );
     } else {
       // Non-clickable mention (user not found)
       parts.push(
-        <Text key={key++} style={[textStyle, { color: '#888' }]}>
+        <Text key={key++} style={[baseTextStyle, mentionStyle, { color: '#888' }]}>
           {mention}
         </Text>
       );
@@ -70,13 +84,13 @@ export const renderTextWithMentions = (
   // Add remaining text
   if (lastIndex < text.length) {
     parts.push(
-      <Text key={key++} style={textStyle}>
+      <Text key={key++} style={baseTextStyle}>
         {text.substring(lastIndex)}
       </Text>
     );
   }
 
-  return <Text style={textStyle}>{parts}</Text>;
+  return <Text style={baseTextStyle}>{parts}</Text>;
 };
 
 export const extractMentionsFromText = (text: string): string[] => {
@@ -98,7 +112,7 @@ export const extractMentionsFromText = (text: string): string[] => {
 // Function để combine content và tags thành text đầy đủ
 export const combineContentWithTags = (
   content?: { text: string },
-  tags?: Array<{ user: { handleName: string } }>
+  tags?: Array<{ user: { username?: string; handleName?: string } }>
 ): string => {
   if (!content?.text && (!tags || tags.length === 0)) {
     return '';
@@ -108,7 +122,10 @@ export const combineContentWithTags = (
   
   // Thêm mentions từ tags vào cuối text
   if (tags && tags.length > 0) {
-    const mentions = tags.map(tag => `@${tag.user.handleName}`).join(' ');
+    const mentions = tags
+      .map(tag => `@${tag.user.username || tag.user.handleName || ''}`.trim())
+      .filter(Boolean)
+      .join(' ');
     fullText = fullText ? `${fullText} ${mentions}` : mentions;
   }
 

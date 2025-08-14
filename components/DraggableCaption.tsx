@@ -39,6 +39,9 @@ export const DraggableCaption: React.FC<DraggableCaptionProps> = ({
   const captionPositionX = useRef(new Animated.Value(0)).current;
   const captionPositionY = useRef(new Animated.Value(0)).current;
 
+  // ✅ Bật drag khi nhấn giữ, tắt khi thả tay (END)
+  const [isDraggingEnabled, setIsDraggingEnabled] = useState(false);
+
   // ✅ Lưu trữ vị trí thực tế để tính toán chính xác
   const [captionPosition, setCaptionPosition] = useState({
     x: initialX,
@@ -102,6 +105,9 @@ export const DraggableCaption: React.FC<DraggableCaptionProps> = ({
       // ✅ Reset translation values
       captionPositionX.setValue(0);
       captionPositionY.setValue(0);
+
+      // ✅ Tắt chế độ kéo sau khi thả
+      setIsDraggingEnabled(false);
     }
   };
 
@@ -114,52 +120,57 @@ export const DraggableCaption: React.FC<DraggableCaptionProps> = ({
   const left = (captionPosition.x / 100) * screenWidth;
   const top = (captionPosition.y / 100) * screenHeight;
 
-  const captionContent = (
-    <Animated.View
-      style={[
-        styles.textInputContainer,
-        style,
-        {
-          position: 'absolute',
-          left,
-          top,
-          transform: draggable
-            ? [
-                {
-                  translateX: captionPositionX,
-                },
-                {
-                  translateY: captionPositionY,
-                },
-              ]
-            : undefined,
-        },
-      ]}
-      onLayout={handleLayout}>
+  const contentInner = (
+    <TouchableOpacity
+      activeOpacity={0.9}
+      onPress={onPress}
+      onLongPress={() => {
+        if (draggable) {
+          setIsDraggingEnabled(true);
+        }
+      }}
+      delayLongPress={200}
+    >
       {renderText ? (
         renderText(text)
       ) : (
         <Text style={[styles.captionText, textStyle]}>{text}</Text>
       )}
-    </Animated.View>
+    </TouchableOpacity>
   );
 
-  if (!draggable) {
-    return (
-      <TouchableOpacity
-        style={captionContent.props.style}
-        onPress={onPress}
-        activeOpacity={onPress ? 0.8 : 1}>
-        {captionContent.props.children}
-      </TouchableOpacity>
-    );
-  }
+  const animatedContainerStyle = [
+    styles.textInputContainer,
+    style,
+    {
+      position: 'absolute',
+      left,
+      top,
+      // ✅ Luôn cung cấp mảng transform hợp lệ để tránh lỗi RN forEach của null
+      transform: [
+        {
+          translateX: captionPositionX,
+        },
+        {
+          translateY: captionPositionY,
+        },
+      ],
+    },
+  ];
 
   return (
     <PanGestureHandler
+      enabled={!!(draggable && isDraggingEnabled)}
       onGestureEvent={onCaptionGestureEvent}
-      onHandlerStateChange={onCaptionHandlerStateChange}>
-      {captionContent}
+      onHandlerStateChange={onCaptionHandlerStateChange}
+    >
+      <Animated.View
+        style={animatedContainerStyle}
+        onLayout={handleLayout}
+        pointerEvents={draggable && isDraggingEnabled ? 'auto' : 'box-none'}
+      >
+        {contentInner}
+      </Animated.View>
     </PanGestureHandler>
   );
 };

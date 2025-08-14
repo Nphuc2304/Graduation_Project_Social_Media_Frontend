@@ -47,18 +47,21 @@ export const EditStory = ({route, navigation}: any) => {
   const [videoCurrentTime, setVideoCurrentTime] = useState(0);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [hasShownModal, setHasShownModal] = useState(false);
-  const [filteredSuggestions, setFilteredSuggestions] = useState<userFollow[]>(
-    [],
-  );
-  const [caption, setCaption] = useState('');
+  const [filteredSuggestions, setFilteredSuggestions] = useState<userFollow[]>([]);
+  // ✅ Nhiều caption: quản lý danh sách và caption đang chỉnh sửa
+  const [captions, setCaptions] = useState<
+    Array<{id: string; text: string; x: number; y: number}>
+  >([]);
+  const [selectedCaptionId, setSelectedCaptionId] = useState<string | null>(null);
+  const [caption, setCaption] = useState(''); // text trong modal cho caption đang chọn
   const progressAnim = useRef(new Animated.Value(0)).current;
   const animationRef = useRef<Animated.CompositeAnimation | null>(null);
   const videoRef = useRef<VideoRef>(null);
   const audioRef = useRef<Sound | null>(null); // ref cho âm thanh
   const sheetRef = useRef<BottomSheetRef>(null);
 
-  // ✅ Lưu trữ vị trí thực tế để tính toán chính xác
-  const [captionPosition, setCaptionPosition] = useState({x: 10, y: 20});
+  // ✅ Vị trí sẽ được lưu trên từng caption, giữ default cho caption mới
+  const defaultCaptionPosition = {x: 10, y: 20};
   const [initialized, setInitialized] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [selectedMusic, setSelectedMusic] = useState<{
@@ -204,23 +207,58 @@ export const EditStory = ({route, navigation}: any) => {
     };
   }, []);
 
-  const handleScreenTap = () => {
+  const generateId = () => `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+  const addNewCaption = () => {
+    const newId = generateId();
+    const newCaption = {
+      id: newId,
+      text: '',
+      x: defaultCaptionPosition.x,
+      y: defaultCaptionPosition.y,
+    };
+    setCaptions(prev => {
+      const list = Array.isArray(prev) ? prev : [];
+      return [...list, newCaption];
+    });
+    setSelectedCaptionId(newId);
+    setCaption('');
+    setFilteredSuggestions([]);
     setIsModalVisible(true);
   };
 
+  const handleScreenTap = () => {
+    addNewCaption();
+  };
+
   const handleDonePress = () => {
+    if (!selectedCaptionId) {
+      setIsModalVisible(false);
+      return;
+    }
+    const trimmed = caption.trim();
+    setCaptions(prev => {
+      const list = Array.isArray(prev) ? prev : [];
+      const exists = list.find(c => c.id === selectedCaptionId);
+      if (!exists) return list;
+      if (trimmed === '') {
+        // Xóa caption rỗng
+        return list.filter(c => c.id !== selectedCaptionId);
+      }
+      return list.map(c => (c.id === selectedCaptionId ? {...c, text: trimmed} : c));
+    });
     setIsModalVisible(false);
     setHasShownModal(true);
+    setFilteredSuggestions([]);
   };
 
   const onChangeCaption = (text: string) => {
     setCaption(text);
-
     const match = text.match(/@([a-zA-Z0-9._]*)$/);
     if (match) {
       const keyword = match[1].toLowerCase();
       const filtered = followingUsers.filter(user =>
-        user.handleName.toLowerCase().includes(keyword),
+        user.username.toLowerCase().includes(keyword),
       );
       setFilteredSuggestions(filtered);
     } else {
@@ -229,10 +267,7 @@ export const EditStory = ({route, navigation}: any) => {
   };
 
   const handleSuggestionPress = (user: userFollow) => {
-    const updated = caption.replace(
-      /@([a-zA-Z0-9._]*)$/,
-      `@${user.handleName} `,
-    );
+    const updated = caption.replace(/@([a-zA-Z0-9._]*)$/, `@${user.username} `);
     setCaption(updated);
     setFilteredSuggestions([]);
   };
@@ -247,9 +282,12 @@ export const EditStory = ({route, navigation}: any) => {
     navigation.goBack();
   };
 
-  // ✅ Callback để cập nhật vị trí caption
-  const handleCaptionPositionChange = (x: number, y: number) => {
-    setCaptionPosition({x, y});
+  // ✅ Callback để cập nhật vị trí caption theo id
+  const handleCaptionPositionChange = (id: string, x: number, y: number) => {
+    setCaptions(prev => {
+      const list = Array.isArray(prev) ? prev : [];
+      return list.map(c => (c.id === id ? {...c, x, y} : c));
+    });
   };
 
   const renderProgressBar = () => {
@@ -278,18 +316,18 @@ export const EditStory = ({route, navigation}: any) => {
   // Function để parse @mentions từ text
   const parseMentionsFromText = (text: string) => {
     const mentionRegex = /@([a-zA-Z0-9._]+)/g;
-    const mentions: Array<{handleName: string; user: userFollow}> = [];
+    const mentions: Array<{username: string; user: userFollow}> = [];
     let match;
 
     while ((match = mentionRegex.exec(text)) !== null) {
-      const handleName = match[1];
+      const username = match[1];
 
       const user = followingUsers.find(
-        u => u.handleName.toLowerCase() === handleName.toLowerCase(),
+        u => u.username.toLowerCase() === username.toLowerCase(),
       );
 
       if (user) {
-        mentions.push({handleName, user});
+        mentions.push({username, user});
       }
     }
 
@@ -339,11 +377,19 @@ export const EditStory = ({route, navigation}: any) => {
         typeof mediaUrl === 'string' && mediaUrl.trim() !== '';
       const isValidMusic =
         selectedMusic?.musicId && typeof selectedMusic.musicId === 'string';
-      const isValidContent =
-        caption !== undefined && caption !== null && caption.trim() !== '';
+      // ✅ Chuẩn bị danh sách caption có text
+      const captionItems = captions
+        .filter(c => (c.text || '').trim().length > 0)
+        .map(c => ({
+          text: (c.text || '').trim(),
+          x: Number(c.x) || 10,
+          y: Number(c.y) || 20,
+        }));
+      const isValidContent = captionItems.length > 0;
 
-      // Parse mentions từ caption
-      const {cleanText, mentions} = parseMentionsFromText(caption);
+      // Parse mentions từ toàn bộ captions (gộp text) để tạo tags
+      const combinedCaptionTextForMentions = captionItems.map(i => i.text).join(' ');
+      const {cleanText, mentions} = parseMentionsFromText(combinedCaptionTextForMentions);
 
       const payload: any = {};
       if (!isValidMedia) {
@@ -359,12 +405,16 @@ export const EditStory = ({route, navigation}: any) => {
         };
       }
 
-      // ✅ Sử dụng vị trí caption đã được cập nhật từ gesture
-      if (isValidContent && cleanText.length > 0) {
+      // ✅ Mã hoá nhiều caption vào content.text bằng marker để viewer parse và hiển thị tách rời
+      if (isValidContent) {
+        const multiPayload = {type: 'multi', items: captionItems};
+        const first = captionItems[0];
         payload.content = {
-          text: cleanText,
-          x: Number(captionPosition.x) || 10,
-          y: Number(captionPosition.y) || 20,
+          // Marker: __MC__ + JSON
+          text: `__MC__${JSON.stringify(multiPayload)}`,
+          // Giữ x,y đầu tiên cho tương thích ngược (không dùng khi viewer parse multi)
+          x: first?.x ?? 10,
+          y: first?.y ?? 20,
         };
       }
 
@@ -418,19 +468,25 @@ export const EditStory = ({route, navigation}: any) => {
   };
   const [isPause, setIsPause] = useState<boolean>(false);
 
-  // ✅ Render caption với DraggableCaption component
-  const renderCaption = () => {
-    if (!caption) return null;
-
-    return (
+  // ✅ Render nhiều caption, tap để chọn & edit, long-press để kéo
+  const renderCaptions = () => {
+    if (!Array.isArray(captions) || captions.length === 0) return null;
+    return captions.map(c => (
       <DraggableCaption
-        text={caption}
-        initialX={captionPosition.x}
-        initialY={captionPosition.y}
-        onPositionChange={handleCaptionPositionChange}
+        key={c.id}
+        text={c.text}
+        initialX={c.x}
+        initialY={c.y}
+        onPositionChange={(x, y) => handleCaptionPositionChange(c.id, x, y)}
         draggable={true}
+        onPress={() => {
+          setSelectedCaptionId(c.id);
+          setCaption(c.text);
+          setFilteredSuggestions([]);
+          setIsModalVisible(true);
+        }}
       />
-    );
+    ));
   };
 
   return (
@@ -465,7 +521,7 @@ export const EditStory = ({route, navigation}: any) => {
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.btnCloser, {marginRight: 15}]}
-                onPress={() => setIsModalVisible(true)}>
+                onPress={addNewCaption}>
                 <Text style={styles.txtAa}>Aa</Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -530,7 +586,7 @@ export const EditStory = ({route, navigation}: any) => {
                     </Text>
                   </View>
                 )}
-                {renderCaption()}
+                {renderCaptions()}
               </View>
             </TouchableWithoutFeedback>
           </View>
@@ -544,7 +600,7 @@ export const EditStory = ({route, navigation}: any) => {
             }}>
             <View style={styles.modalContainer}>
               <View style={styles.modalContent}>
-                <TextInput
+                 <TextInput
                   style={styles.textInput}
                   value={caption}
                   onChangeText={onChangeCaption}
@@ -569,7 +625,7 @@ export const EditStory = ({route, navigation}: any) => {
                         key={index}
                         onPress={() => handleSuggestionPress(user)}
                         style={{padding: 10}}>
-                        <Text style={{color: '#fff'}}>@{user.handleName}</Text>
+                        <Text style={{color: '#fff'}}>@{user.username}</Text>
                       </TouchableOpacity>
                     ))}
                   </View>

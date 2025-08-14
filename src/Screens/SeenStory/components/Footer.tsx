@@ -55,7 +55,7 @@ export const Footer = ({
   };
 
   const handleShareStory = async () => {
-    if (!storyId || !creatorId) {
+    if (!storyId) {
       GlobalAlertManager.show('Lỗi', 'Không thể chia sẻ story');
       return;
     }
@@ -67,7 +67,10 @@ export const Footer = ({
 
     try {
       // Generate deeplink for the story - use universal link format
-      const shareUrl = `https://cirla.io.vn/story/${storyId}/${creatorId}`;
+      // Fallback: allow sharing without creatorId for >24h stories/highlights
+      const shareUrl = creatorId
+        ? `https://cirla.io.vn/story/${storyId}/${creatorId}`
+        : `https://cirla.io.vn/story/${storyId}`;
       
       const result = await Share.share({
         message: `Xem story này trên Cirla: ${shareUrl}`,
