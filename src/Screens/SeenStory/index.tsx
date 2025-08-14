@@ -240,6 +240,15 @@ export const SeenStory = ({route, navigation}: any) => {
       );
     }
 
+    // ✅ In highlight/archive mode, remove stories that were deleted on server
+    // We detect deletion when the story no longer exists in storyDetails store
+    if (route.params?.fromArchive) {
+      const existingStoryIds = new Set(storyDetails.map(s => s._id));
+      filteredStories = filteredStories.filter((story: Story) =>
+        existingStoryIds.has(story._id),
+      );
+    }
+
     // ✅ Use filtered stories directly without expiration check
     const visibleStories = filteredStories;
 
@@ -962,33 +971,36 @@ export const SeenStory = ({route, navigation}: any) => {
     const content = selectedItem?.content;
     const tags = selectedItem?.tags;
 
-    // Combine content text và mentions từ tags
-    const fullText = content?.text || '';
+    // ✅ Normalize tags: backend may send either { user: UserMini } or { user: string, handleName/username }
+    const normalizedMentionData = (tags || [])
+      .map((tag: any) => {
+        if (!tag || typeof tag !== 'object') return null;
+        const originalUser = typeof tag.user === 'object' ? tag.user : undefined;
+        const userId = originalUser?._id || (typeof tag.user === 'string' ? tag.user : undefined);
+        const originalUsername = originalUser?.username || tag?.username;
+        const originalHandleName = originalUser?.handleName || tag?.handleName;
+        if (!userId) return null;
 
-    // ✅ Adapt to backend structure: handleName is at tag level, not nested under user
-    const validTags =
-      tags?.filter((tag: any) => tag.user && tag.handleName) || [];
+        const latest = followingUsers.find(u => u._id === userId);
+        const latestUsername = latest?.username || originalUsername;
+        const latestHandleName = latest?.handleName || originalHandleName;
+        const aliases = Array.from(
+          new Set([
+            originalUsername || '',
+            originalHandleName || '',
+          ].filter(Boolean))
+        );
 
-    const mentionsText =
-      validTags.map((tag: any) => `@${tag.handleName}`).join(' ') || '';
-    const combinedText =
-      fullText && mentionsText
-        ? `${fullText} ${mentionsText}`
-        : fullText || mentionsText;
-
-    if (!combinedText) {
-      return null;
-    }
-
-    // Tạo mention data để có thể click từ valid tags only (adapt to backend structure)
-    const mentionData = validTags.map((tag: any) => ({
-      handleName: tag.handleName,
-      _id: tag.user, // user field is the ID string
-    }));
+        return {
+          _id: userId,
+          username: latestUsername,
+          handleName: latestHandleName,
+          aliases,
+        };
+      })
+      .filter(Boolean);
 
     const handleMentionPress = (userId: string) => {
-      // ✅ Story sẽ tự động pause thông qua blur listener
-      // ✅ Kiểm tra nếu là chính tài khoản hiện tại thì chuyển qua Account
       if (userId === yourUserId) {
         navigation.navigate('Account');
       } else {
@@ -1000,7 +1012,7 @@ export const SeenStory = ({route, navigation}: any) => {
     const renderTextWithMentionsWrapper = (text: string) => {
       return renderTextWithMentions(
         text,
-        mentionData,
+        normalizedMentionData,
         handleMentionPress,
         {
           color: '#fff',
@@ -1015,16 +1027,75 @@ export const SeenStory = ({route, navigation}: any) => {
       );
     };
 
+    const rawText = content?.text || '';
+
+    // ✅ Hỗ trợ hiển thị nhiều caption nếu content.text được mã hoá bằng marker __MC__
+    if (typeof rawText === 'string' && rawText.startsWith('__MC__')) {
+      try {
+        const json = rawText.slice('__MC__'.length);
+        const parsed = JSON.parse(json);
+        if (
+          parsed &&
+          parsed.type === 'multi' &&
+          Array.isArray(parsed.items) &&
+          parsed.items.length > 0
+        ) {
+          return (
+            <>
+              {parsed.items.map((item: any, index: number) => {
+                const ix = Number(item?.x) || 10;
+                const iy = Number(item?.y) || 20;
+                const itext = String(item?.text || '');
+                if (!itext) return null;
+                return (
+                  <DraggableCaption
+                    key={`mc_${selectedItem?._id}_${index}`}
+                    text={itext}
+                    initialX={ix}
+                    initialY={iy}
+                    draggable={false}
+                    renderText={renderTextWithMentionsWrapper}
+                    style={{zIndex: 1000}}
+                  />
+                );
+              })}
+            </>
+          );
+        }
+      } catch (e) {
+        // Fallback bên dưới
+      }
+    }
+
+    // Fallback: hiển thị như logic cũ (một caption duy nhất)
+    const fullText = content?.text || '';
+    const mentionsText =
+      (tags || [])
+        .map((tag: any) => {
+          if (tag?.user && typeof tag.user === 'object') {
+            return `@${tag.user.username || tag.user.handleName || ''}`.trim();
+          }
+          return `@${tag?.username || tag?.handleName || ''}`.trim();
+        })
+        .filter(Boolean)
+        .join(' ') || '';
+    const combinedText =
+      fullText && mentionsText
+        ? `${fullText} ${mentionsText}`
+        : fullText || mentionsText;
+
+    if (!combinedText) {
+      return null;
+    }
+
     return (
       <DraggableCaption
         text={combinedText}
         initialX={content?.x || 10}
         initialY={content?.y || 20}
-        draggable={false} // Không cho phép kéo trong SeenStory
+        draggable={false}
         renderText={renderTextWithMentionsWrapper}
-        style={{
-          zIndex: 1000,
-        }}
+        style={{zIndex: 1000}}
       />
     );
   };
@@ -1249,7 +1320,7 @@ export const SeenStory = ({route, navigation}: any) => {
             setIsPaused(prev => !prev);
           }}
           storyId={selectedItem?._id}
-          creatorId={currentCreator?._id}
+          creatorId={currentCreator?._id || selectedItem?.ownerId}
           shareCount={selectedItem?.shareCount || 0}
           createdAt={selectedItem?.createdAt}
         />

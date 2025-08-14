@@ -248,12 +248,13 @@ export const handleUserPress = async (
         navigation.setParams({
           stories: updatedStoryDetails,
           creator: {
-            username: item.handleName,
+            username: item.username, // ✅ Sửa: dùng username thay vì handleName
+            handleName: item.handleName, // ✅ Thêm handleName để xử lý logic
             profilePic: item.profilePic,
             _id: item._id,
           },
           storyGroups: initialStoryGroups.map(group =>
-            group.creator.username === item.handleName
+            group.creator.username === item.username // ✅ Sửa: so sánh với username thay vì handleName
               ? {...group, stories: updatedStoryDetails}
               : group,
           ),
@@ -534,7 +535,8 @@ export const handleHighlightPress = async (
     }
 
     const creator = {
-      username: viewerUser?.handleName,
+      username: viewerUser?.username, // ✅ Sửa: dùng username thay vì handleName
+      handleName: viewerUser?.handleName, // ✅ Thêm handleName để xử lý logic
       profilePic: viewerUser?.profilePic,
       _id: viewerUser?._id,
     };
@@ -575,7 +577,7 @@ export const handleHighlightPress = async (
         storyGroupIndex: 0,
         creator,
         stories: validStories,
-        fromArchive: isOwner, // ✅ Truyền flag để biết đây là từ Archive
+        fromArchive: true, // ✅ Highlights are archive-like: always bypass 24h filtering
         timestamp: Date.now(),
       });
       return;
@@ -769,7 +771,7 @@ export const handleHighlightPress = async (
       storyGroupIndex: currentGroupIndex >= 0 ? currentGroupIndex : 0,
       creator,
       stories: validStories,
-      fromArchive: isOwner, // ✅ Truyền flag để biết đây là từ Archive
+      fromArchive: true, // ✅ Highlights are archive-like: always bypass 24h filtering
       timestamp: Date.now(),
     });
   } catch (error) {

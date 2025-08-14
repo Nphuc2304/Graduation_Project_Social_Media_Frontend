@@ -21,17 +21,33 @@ export async function setupCallKeep() {
   await RNCallKeep.setup(options);
   RNCallKeep.setAvailable(true);
 
-  // Listeners
   RNCallKeep.addEventListener('answerCall', ({callUUID}) => {
-    navigationRef.current?.navigate('ZegoCallScreen', {
-      callUUID,
-      isIncoming: true,
+    navigationRef.current?.reset({
+      index: 0,
+      routes: [
+        {name: 'BottomTabs'},
+        {
+          name: 'ZegoCallScreen',
+          params: {
+            callUUID,
+            isIncoming: true,
+            userID: 'remote-user-id',
+            userName: 'remote-user-name',
+            callID: callUUID,
+            image: 'https://link-to-avatar',
+            isCaller: false,
+          },
+        },
+      ],
     });
   });
 
   RNCallKeep.addEventListener('endCall', ({callUUID}) => {
-    if (navigationRef.current?.canGoBack()) {
-      navigationRef.current.goBack();
+    if (navigationRef.current?.getCurrentRoute()?.name === 'ZegoCallScreen') {
+      navigationRef.current?.reset({
+        index: 0,
+        routes: [{name: 'BottomTabs'}],
+      });
     } else {
       navigationRef.current?.navigate('BottomTabs');
     }

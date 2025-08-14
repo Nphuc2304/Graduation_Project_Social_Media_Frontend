@@ -1,0 +1,21 @@
+*** Begin Patch
+*** Add File: patches/react-native-vision-camera+4.7.1.patch
+diff --git a/node_modules/react-native-vision-camera/android/src/main/java/com/mrousavy/camera/react/CameraDevicesManager.kt b/node_modules/react-native-vision-camera/android/src/main/java/com/mrousavy/camera/react/CameraDevicesManager.kt
+index 408f5b6..c1b7c77 100644
+--- a/node_modules/react-native-vision-camera/android/src/main/java/com/mrousavy/camera/react/CameraDevicesManager.kt
++++ b/node_modules/react-native-vision-camera/android/src/main/java/com/mrousavy/camera/react/CameraDevicesManager.kt
+@@ -99,7 +99,12 @@ class CameraDevicesManager(private val reactContext: ReactApplicationContext) : 
+   }
+ 
+   fun sendAvailableDevicesChangedEvent() {
+-    val eventEmitter = reactContext.getJSModule(RCTDeviceEventEmitter::class.java)
++    // Guard against emitting events before React instance is ready to avoid crashes on app start.
++    if (!reactContext.hasActiveReactInstance()) {
++      Log.w(TAG, "React instance not ready yet. Skipping CameraDevicesChanged event.")
++      return
++    }
++    val eventEmitter = reactContext.getJSModule(RCTDeviceEventEmitter::class.java)
+     val devices = getDevicesJson()
+     eventEmitter.emit("CameraDevicesChanged", devices)
+   }
+*** End Patch
