@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import {useCallback, useEffect, useRef, useState} from 'react';
+import {useEffect, useRef, useState} from 'react';
 import BottomSheetComment, {
   BottomSheetCommentRef,
 } from '../src/(tabs)/Home/components/CommentSection';
@@ -35,6 +35,8 @@ interface RouteParams {
   clearSearchRedux?: boolean;
   isSimilar?: boolean;
 }
+
+const ESTIMATED_ITEM_HEIGHT = 700;
 
 const AllPostOfCollectionContent = () => {
   const route = useRoute();
@@ -68,13 +70,10 @@ const AllPostOfCollectionContent = () => {
   const [maxPage, setMaxPage] = useState(0);
   const targetIndex = posts.findIndex(p => p._id === targetPostId);
 
-  const onViewRef = useCallback(
-    ({viewableItems}: {viewableItems: any[]}) => {
-      const id = viewableItems[0]?.item?._id;
-      if (id) setCurrentVisible(id);
-    },
-    [postList],
-  );
+  const onViewRef = useRef(({viewableItems}: {viewableItems: any[]}) => {
+    const id = viewableItems[0]?.item?._id;
+    if (id) setCurrentVisible(id);
+  }).current;
 
   useEffect(() => {
     return () => {
@@ -142,7 +141,7 @@ const AllPostOfCollectionContent = () => {
             keyExtractor={item => item._id}
             extraData={{currentVisible, isFocused}}
             onViewableItemsChanged={onViewRef}
-            viewabilityConfig={{itemVisiblePercentThreshold: 100}}
+            viewabilityConfig={{itemVisiblePercentThreshold: 80}}
             renderItem={({item}) => {
               const shouldPlay = item._id === currentVisible;
               return (
@@ -178,12 +177,26 @@ const AllPostOfCollectionContent = () => {
             showsVerticalScrollIndicator={false}
             initialScrollIndex={targetIndex >= 0 ? targetIndex : 0}
             removeClippedSubviews={true}
-            maintainVisibleContentPosition={{minIndexForVisible: 0}}
             getItemLayout={(_, index) => ({
-              length: 500,
-              offset: 500 * index,
+              length: ESTIMATED_ITEM_HEIGHT,
+              offset: ESTIMATED_ITEM_HEIGHT * index,
               index,
             })}
+            onScrollToIndexFailed={info => {
+              const offset = Math.max(
+                0,
+                (info.averageItemLength || ESTIMATED_ITEM_HEIGHT) * info.index,
+              );
+              requestAnimationFrame(() => {
+                listRef.current?.scrollToOffset({offset, animated: false});
+                setTimeout(() => {
+                  listRef.current?.scrollToIndex({
+                    index: info.index,
+                    animated: false,
+                  });
+                }, 50);
+              });
+            }}
             onEndReached={() => {
               if (isSimilar && !(pageSimilar > maxPage)) {
                 setIsLoadSimilar(true);
@@ -202,7 +215,11 @@ const AllPostOfCollectionContent = () => {
               }
             }}
             onEndReachedThreshold={0.2}
-            ListFooterComponent={isLoadSimilar ? (<ActivityIndicator size={'small'} color={colors.primary} />) : null}
+            ListFooterComponent={
+              isLoadSimilar ? (
+                <ActivityIndicator size={'small'} color={colors.primary} />
+              ) : null
+            }
           />
           <BottomSheetComment
             ref={sheetRef}
