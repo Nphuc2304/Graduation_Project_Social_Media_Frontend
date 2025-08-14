@@ -17,6 +17,14 @@ export const renderTextWithMentions = (
     return <Text style={textStyle}></Text>;
   }
 
+  // Ensure a consistent line height between normal text and mentions
+  const baseFontSize = (textStyle && textStyle.fontSize) || 20;
+  const baseTextStyle = {
+    ...textStyle,
+    lineHeight:
+      (textStyle && textStyle.lineHeight) || Math.round(baseFontSize * 1.25),
+  };
+
   const mentionRegex = /@([a-zA-Z0-9._]+)/g;
   const parts: React.ReactNode[] = [];
   let lastIndex = 0;
@@ -27,7 +35,7 @@ export const renderTextWithMentions = (
     // Add text before the mention
     if (match.index > lastIndex) {
       parts.push(
-        <Text key={key++} style={textStyle}>
+        <Text key={key++} style={baseTextStyle}>
           {text.substring(lastIndex, match.index)}
         </Text>
       );
@@ -42,23 +50,21 @@ export const renderTextWithMentions = (
     );
 
     if (userData) {
-      // Clickable mention
+      // Clickable mention using Text to keep typography identical
       parts.push(
-        <TouchableOpacity
+        <Text
           key={key++}
           onPress={() => onMentionPress(userData._id)}
-          activeOpacity={0.7}
-          style={{ flexDirection: 'row' }}
+          style={[baseTextStyle, mentionStyle, { color: '#4A90E2' }]}
+          suppressHighlighting
         >
-          <Text style={[textStyle, mentionStyle, { color: '#4A90E2' }]}>
-            {mention}
-          </Text>
-        </TouchableOpacity>
+          {mention}
+        </Text>
       );
     } else {
       // Non-clickable mention (user not found)
       parts.push(
-        <Text key={key++} style={[textStyle, { color: '#888' }]}>
+        <Text key={key++} style={[baseTextStyle, mentionStyle, { color: '#888' }]}>
           {mention}
         </Text>
       );
@@ -70,13 +76,13 @@ export const renderTextWithMentions = (
   // Add remaining text
   if (lastIndex < text.length) {
     parts.push(
-      <Text key={key++} style={textStyle}>
+      <Text key={key++} style={baseTextStyle}>
         {text.substring(lastIndex)}
       </Text>
     );
   }
 
-  return <Text style={textStyle}>{parts}</Text>;
+  return <Text style={baseTextStyle}>{parts}</Text>;
 };
 
 export const extractMentionsFromText = (text: string): string[] => {

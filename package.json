@@ -80,7 +80,7 @@
     "react-native-uuid": "^2.0.3",
     "react-native-vector-icons": "^10.2.0",
     "react-native-video": "^6.13.0",
-    "react-native-vision-camera": "^4.7.0",
+    "react-native-vision-camera": "^4.7.1",
     "react-native-webrtc": "^124.0.5",
     "react-redux": "^9.2.0",
     "reactotron-redux": "^3.2.0",
