@@ -51,9 +51,10 @@ const ExploreSection: React.FC<ExploreSectionProps> = ({
     _isBigMedia: boolean = false,
   ) => {
     navigation.navigate('AllPostOfCollection', {
-      posts: data,
+      posts: [],
       targetPostId: exploreMediaId,
       playlistName: 'Bài viết',
+      isSimilar: true,
     });
   };
 
