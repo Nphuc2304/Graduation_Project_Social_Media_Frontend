@@ -2,7 +2,8 @@ import React from 'react';
 import { Text, TouchableOpacity } from 'react-native';
 
 interface MentionData {
-  handleName: string;
+  username?: string;
+  handleName?: string; // backward compatibility
   _id: string;
 }
 
@@ -42,12 +43,15 @@ export const renderTextWithMentions = (
     }
 
     const mention = match[0]; // @username
-    const handleName = match[1]; // username without @
+    const mentionName = match[1]; // username without @
 
-    // Find user data by handleName
-    const userData = mentionData.find(user => 
-      user.handleName.toLowerCase() === handleName.toLowerCase()
-    );
+    // Find user data by username first, fallback to handleName
+    const lower = mentionName.toLowerCase();
+    const userData = mentionData.find(user => {
+      const u = (user.username || '').toLowerCase();
+      const h = (user.handleName || '').toLowerCase();
+      return (u && u === lower) || (h && h === lower);
+    });
 
     if (userData) {
       // Clickable mention using Text to keep typography identical
@@ -104,7 +108,7 @@ export const extractMentionsFromText = (text: string): string[] => {
 // Function để combine content và tags thành text đầy đủ
 export const combineContentWithTags = (
   content?: { text: string },
-  tags?: Array<{ user: { handleName: string } }>
+  tags?: Array<{ user: { username?: string; handleName?: string } }>
 ): string => {
   if (!content?.text && (!tags || tags.length === 0)) {
     return '';
@@ -114,7 +118,10 @@ export const combineContentWithTags = (
   
   // Thêm mentions từ tags vào cuối text
   if (tags && tags.length > 0) {
-    const mentions = tags.map(tag => `@${tag.user.handleName}`).join(' ');
+    const mentions = tags
+      .map(tag => `@${tag.user.username || tag.user.handleName || ''}`.trim())
+      .filter(Boolean)
+      .join(' ');
     fullText = fullText ? `${fullText} ${mentions}` : mentions;
   }
 

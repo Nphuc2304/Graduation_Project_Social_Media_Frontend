@@ -258,7 +258,7 @@ export const EditStory = ({route, navigation}: any) => {
     if (match) {
       const keyword = match[1].toLowerCase();
       const filtered = followingUsers.filter(user =>
-        user.handleName.toLowerCase().includes(keyword),
+        user.username.toLowerCase().includes(keyword),
       );
       setFilteredSuggestions(filtered);
     } else {
@@ -267,7 +267,7 @@ export const EditStory = ({route, navigation}: any) => {
   };
 
   const handleSuggestionPress = (user: userFollow) => {
-    const updated = caption.replace(/@([a-zA-Z0-9._]*)$/, `@${user.handleName} `);
+    const updated = caption.replace(/@([a-zA-Z0-9._]*)$/, `@${user.username} `);
     setCaption(updated);
     setFilteredSuggestions([]);
   };
@@ -316,18 +316,18 @@ export const EditStory = ({route, navigation}: any) => {
   // Function để parse @mentions từ text
   const parseMentionsFromText = (text: string) => {
     const mentionRegex = /@([a-zA-Z0-9._]+)/g;
-    const mentions: Array<{handleName: string; user: userFollow}> = [];
+    const mentions: Array<{username: string; user: userFollow}> = [];
     let match;
 
     while ((match = mentionRegex.exec(text)) !== null) {
-      const handleName = match[1];
+      const username = match[1];
 
       const user = followingUsers.find(
-        u => u.handleName.toLowerCase() === handleName.toLowerCase(),
+        u => u.username.toLowerCase() === username.toLowerCase(),
       );
 
       if (user) {
-        mentions.push({handleName, user});
+        mentions.push({username, user});
       }
     }
 
@@ -625,7 +625,7 @@ export const EditStory = ({route, navigation}: any) => {
                         key={index}
                         onPress={() => handleSuggestionPress(user)}
                         style={{padding: 10}}>
-                        <Text style={{color: '#fff'}}>@{user.handleName}</Text>
+                        <Text style={{color: '#fff'}}>@{user.username}</Text>
                       </TouchableOpacity>
                     ))}
                   </View>

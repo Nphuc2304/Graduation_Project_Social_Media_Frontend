@@ -971,14 +971,28 @@ export const SeenStory = ({route, navigation}: any) => {
     const content = selectedItem?.content;
     const tags = selectedItem?.tags;
 
-    // ✅ Adapt to backend structure: handleName is at tag level, not nested under user
-    const validTags = (tags?.filter((tag: any) => tag.user && tag.handleName) || []);
-
-    // Tạo mention data để có thể click từ valid tags only
-    const mentionData = validTags.map((tag: any) => ({
-      handleName: tag.handleName,
-      _id: tag.user, // user field is the ID string
-    }));
+    // ✅ Normalize tags: backend may send either { user: UserMini } or { user: string, handleName/username }
+    const normalizedMentionData = (tags || [])
+      .map((tag: any) => {
+        // If tag.user is an object with username, use it; else use flat properties
+        if (tag && typeof tag === 'object') {
+          if (tag.user && typeof tag.user === 'object') {
+            return {
+              username: tag.user.username,
+              handleName: tag.user.handleName,
+              _id: tag.user._id,
+            };
+          }
+          // tag.user may be an id string and separate handleName/username are at root
+          return {
+            username: tag.username,
+            handleName: tag.handleName,
+            _id: tag.user,
+          };
+        }
+        return null;
+      })
+      .filter(Boolean);
 
     const handleMentionPress = (userId: string) => {
       if (userId === yourUserId) {
@@ -992,7 +1006,7 @@ export const SeenStory = ({route, navigation}: any) => {
     const renderTextWithMentionsWrapper = (text: string) => {
       return renderTextWithMentions(
         text,
-        mentionData,
+        normalizedMentionData,
         handleMentionPress,
         {
           color: '#fff',
@@ -1050,7 +1064,15 @@ export const SeenStory = ({route, navigation}: any) => {
     // Fallback: hiển thị như logic cũ (một caption duy nhất)
     const fullText = content?.text || '';
     const mentionsText =
-      validTags.map((tag: any) => `@${tag.handleName}`).join(' ') || '';
+      (tags || [])
+        .map((tag: any) => {
+          if (tag?.user && typeof tag.user === 'object') {
+            return `@${tag.user.username || tag.user.handleName || ''}`.trim();
+          }
+          return `@${tag?.username || tag?.handleName || ''}`.trim();
+        })
+        .filter(Boolean)
+        .join(' ') || '';
     const combinedText =
       fullText && mentionsText
         ? `${fullText} ${mentionsText}`
