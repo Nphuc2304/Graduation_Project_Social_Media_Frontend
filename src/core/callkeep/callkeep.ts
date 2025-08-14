@@ -2,6 +2,7 @@ import RNCallKeep, {IOptions} from 'react-native-callkeep';
 import 'react-native-get-random-values';
 import {navigationRef} from '../../../src/NavigationService';
 import {v4 as uuidv4} from 'uuid';
+import {getGlobalSocket} from '@services/SocketContext';
 
 const options: IOptions = {
   ios: {appName: 'YourApp', supportsVideo: true},
@@ -16,50 +17,65 @@ const options: IOptions = {
 
 let initialized = false;
 
+// Lưu thông tin call hiện tại để end/ cancel
+let currentCallData: {
+  uuid: string;
+  roomId: string;
+  senderId: string;
+  startTime?: number;
+  isAnswered?: boolean;
+} | null = null;
+
 export async function setupCallKeep() {
   if (initialized) return;
   await RNCallKeep.setup(options);
   RNCallKeep.setAvailable(true);
 
+  // Khi người nhận trả lời
   RNCallKeep.addEventListener('answerCall', ({callUUID}) => {
-    navigationRef.current?.reset({
-      index: 0,
-      routes: [
-        {name: 'BottomTabs'},
-        {
-          name: 'ZegoCallScreen',
-          params: {
-            callUUID,
-            isIncoming: true,
-            userID: 'remote-user-id',
-            userName: 'remote-user-name',
-            callID: callUUID,
-            image: 'https://link-to-avatar',
-            isCaller: false,
-          },
-        },
-      ],
+    if (currentCallData) {
+      currentCallData.isAnswered = true;
+      currentCallData.startTime = Date.now();
+    }
+
+    navigationRef.current?.navigate('ZegoCallScreen', {
+      callUUID,
+      isIncoming: true,
+      userID: 'remote-user-id',
+      userName: 'remote-user-name',
+      callID: callUUID,
+      image: 'https://link-to-avatar',
+      isCaller: false,
     });
   });
 
+  // Khi kết thúc cuộc gọi
   RNCallKeep.addEventListener('endCall', ({callUUID}) => {
-    if (navigationRef.current?.getCurrentRoute()?.name === 'ZegoCallScreen') {
-      navigationRef.current?.reset({
-        index: 0,
-        routes: [{name: 'BottomTabs'}],
-      });
-    } else {
-      navigationRef.current?.navigate('BottomTabs');
-    }
-    RNCallKeep.endCall(callUUID);
-  });
+    if (currentCallData) {
+      const duration = currentCallData.startTime
+        ? Math.floor((Date.now() - currentCallData.startTime) / 1000)
+        : 0;
 
-  RNCallKeep.addEventListener(
-    'didDisplayIncomingCall',
-    ({callUUID, handle}) => {
-      // optional: log/analytics
-    },
-  );
+      if (currentCallData.isAnswered) {
+        // Đã trả lời => gửi callEnded
+        getGlobalSocket()?.emit('callEnded', {
+          roomId: currentCallData.roomId,
+          senderId: currentCallData.senderId,
+          missed: false,
+          duration,
+        });
+      } else {
+        // Chưa trả lời => gửi callCancelled
+        getGlobalSocket()?.emit('callCancelled', {
+          roomId: currentCallData.roomId,
+          senderId: currentCallData.senderId,
+        });
+      }
+    }
+
+    RNCallKeep.endCall(callUUID);
+    currentCallData = null;
+  });
 
   initialized = true;
 }
@@ -69,12 +85,22 @@ export function showIncomingCall({
   callerName = 'Người gọi',
   handle = 'number',
   hasVideo = true,
+  roomId,
+  senderId,
 }: {
   uuid?: string;
   callerName?: string;
   handle?: string;
   hasVideo?: boolean;
+  roomId: string;
+  senderId: string;
 }) {
+  currentCallData = {
+    uuid,
+    roomId,
+    senderId,
+    isAnswered: false,
+  };
   RNCallKeep.displayIncomingCall(uuid, handle, callerName, 'generic', hasVideo);
   return uuid;
 }
@@ -83,11 +109,21 @@ export function startOutgoingCall({
   uuid = uuidv4(),
   callee = 'number',
   hasVideo = true,
+  roomId,
+  senderId,
 }: {
   uuid?: string;
   callee?: string;
   hasVideo?: boolean;
+  roomId: string;
+  senderId: string;
 }) {
+  currentCallData = {
+    uuid,
+    roomId,
+    senderId,
+    isAnswered: false,
+  };
   RNCallKeep.startCall(uuid, callee, callee, 'number', hasVideo);
   return uuid;
 }

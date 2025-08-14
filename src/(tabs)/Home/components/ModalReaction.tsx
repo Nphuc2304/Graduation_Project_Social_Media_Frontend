@@ -102,7 +102,7 @@ const ModalReaction = forwardRef<Modalize, ModalReactionProps>(
                   : styles.followButtonText,
               ]}
               numberOfLines={1}>
-              {item.userFollowing ? 'Đã theo dõi' : 'Theo dõi'}
+              {item.userFollowing ? 'Đang theo dõi' : 'Theo dõi'}
             </Text>
           </TouchableOpacity>
         )}

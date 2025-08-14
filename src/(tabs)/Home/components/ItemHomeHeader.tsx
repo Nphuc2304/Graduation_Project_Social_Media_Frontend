@@ -67,7 +67,7 @@ export const ItemHomeHeader: React.FC<ItemHomeHeaderProps> = ({
             style={[ItemHomeStyles.btnFollow, {borderColor}]}
             onPress={() => onFollowPress(mine)}>
             <Text style={[ItemHomeStyles.textNormal, {color: textColor}]}>
-              {follow ? 'Đã theo dõi' : 'Theo dõi'}
+              {follow ? 'Đang theo dõi' : 'Theo dõi'}
             </Text>
           </TouchableOpacity>
         )}
