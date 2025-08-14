@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import {Colors} from '@assets/color/Colors';
 import IncomingCallModal from '../../../../components/IncomingCallModal';
-import {useSocket} from '@services/SocketContext';
+import {getGlobalSocket, useSocket} from '@services/SocketContext';
 import {ArrowLeft, Phone, Video, AlertCircle} from 'lucide-react-native';
 import {Room, RoomUser} from '@services/roomRedux/roomType';
 import {User} from '@services/userRedux/userTypes';
@@ -20,6 +20,7 @@ import CustomPopupModal, {
 import 'react-native-get-random-values';
 import RNCallKeep from 'react-native-callkeep';
 import {v4 as uuidv4} from 'uuid';
+import {currentCall} from '../../../../src/core/callkeep/CallState';
 
 interface MessageHeaderProps {
   user1?: RoomUser;
@@ -73,6 +74,14 @@ const MessageHeader: React.FC<MessageHeaderProps> = ({
 
     const callUUID = uuidv4();
 
+    // Lưu call state
+    currentCall.roomId = room._id;
+    currentCall.callerId = userC._id;
+    currentCall.callerName = userC.username;
+    currentCall.callerAvatar = userC.profilePic;
+    currentCall.type = 'video';
+    currentCall.startTime = Date.now();
+
     RNCallKeep.startCall(
       callUUID,
       user1.username ?? 'Người nhận',
@@ -91,11 +100,19 @@ const MessageHeader: React.FC<MessageHeaderProps> = ({
     });
   };
 
+  // Gọi voice
   const handleVoiceCall = () => {
     if (!room?._id || !userC || !user1) return;
     Vibration.vibrate(50);
 
     const callUUID = uuidv4();
+
+    currentCall.roomId = room._id;
+    currentCall.callerId = userC._id;
+    currentCall.callerName = userC.username;
+    currentCall.callerAvatar = userC.profilePic;
+    currentCall.type = 'voice';
+    currentCall.startTime = Date.now();
 
     RNCallKeep.startCall(
       callUUID,
@@ -115,54 +132,18 @@ const MessageHeader: React.FC<MessageHeaderProps> = ({
     });
   };
 
-  useEffect(() => {
-    if (!socket) return;
-
-    const onIncoming = ({
-      callerId,
-      callerName,
-      callerAvatar,
-      type,
-      callUUID,
-      roomId,
-    }: {
-      callerId: string;
-      callerName: string;
-      callerAvatar?: string;
-      type: 'video' | 'voice';
-      callUUID: string;
-      roomId: string;
-    }) => {
-      RNCallKeep.displayIncomingCall(
-        callUUID,
-        callerName || 'Không xác định',
-        callerName || 'Không xác định',
-        'number',
-        type === 'video',
-      );
-
-      setIncomingCall({
-        visible: true,
-        callerId,
-        callerName,
-        callerAvatar,
-        type,
-        callUUID,
-        roomId,
-      });
-    };
-
-    socket.on('incomingCall', onIncoming);
-    return () => {
-      socket.off('incomingCall', onIncoming);
-    };
-  }, [socket]);
-
-  // Chấp nhận cuộc gọi
+  // Nhận và chấp nhận cuộc gọi
   const handleAcceptCall = () => {
     if (rejectTimeoutRef.current) clearTimeout(rejectTimeoutRef.current);
 
     RNCallKeep.answerIncomingCall(incomingCall.callUUID);
+
+    getGlobalSocket()?.emit('callAnswered', {
+      roomId: incomingCall.roomId,
+      calleeId: userC?._id,
+      callerId: incomingCall.callerId,
+    });
+
     setIncomingCall(prev => ({...prev, visible: false}));
 
     navigation.navigate('ZegoCallScreen', {
@@ -175,12 +156,13 @@ const MessageHeader: React.FC<MessageHeaderProps> = ({
     });
   };
 
-  // Từ chối cuộc gọi
+  // Từ chối
   const handleRejectCall = () => {
     if (rejectTimeoutRef.current) clearTimeout(rejectTimeoutRef.current);
     RNCallKeep.endCall(incomingCall.callUUID);
 
     socket?.emit('callCancelled', {
+      // hoặc 'callRejected' nếu BE quy định
       roomId: room?._id,
       senderId: userC?._id,
     });
