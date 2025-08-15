@@ -18,9 +18,11 @@ import CustomPopupModal, {
   CustomPopupModalRef,
 } from '../../../../components/Global/CustomPopupModal';
 import 'react-native-get-random-values';
-import RNCallKeep from 'react-native-callkeep';
 import {v4 as uuidv4} from 'uuid';
-import {currentCall} from '../../../../src/core/callkeep/CallState';
+import {
+  endCall,
+  startOutgoingCall,
+} from '../../../../src/core/callkeep/callkeep';
 
 interface MessageHeaderProps {
   user1?: RoomUser;
@@ -57,22 +59,16 @@ const MessageHeader: React.FC<MessageHeaderProps> = ({
     roomId: '',
   });
 
-  const rejectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  /** Kết nối socket khi vào phòng */
   useEffect(() => {
     if (room?._id) {
       connectToSocket(room._id);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [room?._id]);
 
-  /** Lắng nghe incomingCall từ server */
   useEffect(() => {
     if (!socket) return;
 
     const onIncomingCall = (data: any) => {
-      // Nếu mình là người nhận thì hiển thị modal nhận cuộc gọi
       if (data?.callerId !== userC?._id && data?.roomId === room?._id) {
         setIncomingCall({
           visible: true,
@@ -82,16 +78,6 @@ const MessageHeader: React.FC<MessageHeaderProps> = ({
           type: data.type,
           callUUID: data.callUUID,
           roomId: data.roomId,
-        });
-        // Lưu vào currentCall để CallKeep biết
-        Object.assign(currentCall, {
-          roomId: data.roomId,
-          callerId: data.callerId,
-          callerName: data.callerName,
-          callerAvatar: data.callerAvatar,
-          type: data.type,
-          startTime: Date.now(),
-          isCaller: false,
         });
       }
     };
@@ -103,7 +89,6 @@ const MessageHeader: React.FC<MessageHeaderProps> = ({
     };
   }, [socket, userC?._id, room?._id]);
 
-  /** Emit helper */
   const emitGlobal = (event: string, data: any) => {
     socket?.emit(event, data);
   };
@@ -113,25 +98,15 @@ const MessageHeader: React.FC<MessageHeaderProps> = ({
     if (!room?._id || !userC || !user1) return;
     Vibration.vibrate(50);
 
-    const callUUID = uuidv4();
-    Object.assign(currentCall, {
-      uuid: callUUID,
+    const callUUID = startOutgoingCall({
+      uuid: uuidv4(),
+      callee: user1.username ?? 'Người nhận',
+      hasVideo: true,
       roomId: room._id,
-      callerId: userC._id,
-      callerName: userC.username,
-      callerAvatar: userC.profilePic,
-      type: 'video',
-      startTime: Date.now(),
-      isCaller: true,
+      selfId: userC._id,
+      calleeId: user1._id,
+      calleeName: user1.username,
     });
-
-    RNCallKeep.startCall(
-      callUUID,
-      user1.username ?? 'Người nhận',
-      user1.username ?? 'Người nhận',
-      'number',
-      true,
-    );
 
     emitGlobal('incomingCall', {
       callerId: userC._id,
@@ -149,25 +124,15 @@ const MessageHeader: React.FC<MessageHeaderProps> = ({
     if (!room?._id || !userC || !user1) return;
     Vibration.vibrate(50);
 
-    const callUUID = uuidv4();
-    Object.assign(currentCall, {
-      uuid: callUUID,
+    const callUUID = startOutgoingCall({
+      uuid: uuidv4(),
+      callee: user1.username ?? 'Người nhận',
+      hasVideo: false,
       roomId: room._id,
-      callerId: userC._id,
-      callerName: userC.username,
-      callerAvatar: userC.profilePic,
-      type: 'voice',
-      startTime: Date.now(),
-      isCaller: true,
+      selfId: userC._id,
+      calleeId: user1._id,
+      calleeName: user1.username,
     });
-
-    RNCallKeep.startCall(
-      callUUID,
-      user1.username ?? 'Người nhận',
-      user1.username ?? 'Người nhận',
-      'number',
-      false,
-    );
 
     emitGlobal('incomingCall', {
       callerId: userC._id,
@@ -179,57 +144,6 @@ const MessageHeader: React.FC<MessageHeaderProps> = ({
       accepted: false,
     });
   };
-
-  /** Chấp nhận cuộc gọi */
-  const handleAcceptCall = () => {
-    if (rejectTimeoutRef.current) clearTimeout(rejectTimeoutRef.current);
-    RNCallKeep.answerIncomingCall(incomingCall.callUUID);
-
-    emitGlobal('incomingCall', {
-      ...incomingCall,
-      accepted: true,
-      calleeId: userC?._id,
-    });
-
-    setIncomingCall(prev => ({...prev, visible: false}));
-
-    navigation.navigate('ZegoCallScreen', {
-      callUUID: incomingCall.callUUID,
-      isIncoming: true,
-      userID: incomingCall.callerId,
-      userName: incomingCall.callerName,
-      callID: incomingCall.roomId,
-      image: incomingCall.callerAvatar,
-      callType: incomingCall.type,
-      isCaller: false,
-    });
-  };
-
-  /** Từ chối cuộc gọi */
-  const handleRejectCall = () => {
-    if (rejectTimeoutRef.current) clearTimeout(rejectTimeoutRef.current);
-    RNCallKeep.endCall(incomingCall.callUUID);
-
-    emitGlobal('callEnded', {
-      // <-- đã đổi từ callCancelled sang callEnded
-      roomId: incomingCall.roomId,
-      senderId: userC?._id,
-    });
-
-    setIncomingCall(prev => ({...prev, visible: false}));
-  };
-
-  /** Auto reject sau 10s nếu không nhấc máy */
-  useEffect(() => {
-    if (incomingCall.visible) {
-      rejectTimeoutRef.current = setTimeout(() => {
-        handleRejectCall();
-      }, 10000);
-    }
-    return () => {
-      if (rejectTimeoutRef.current) clearTimeout(rejectTimeoutRef.current);
-    };
-  }, [incomingCall.visible]);
 
   const shouldShowCallIcons =
     showCallFeatures && room?.type !== 'waiting' && userC;
@@ -327,14 +241,6 @@ const MessageHeader: React.FC<MessageHeaderProps> = ({
           </TouchableOpacity>
         </View>
       </View>
-
-      <IncomingCallModal
-        visible={incomingCall.visible}
-        callerName={incomingCall.callerName}
-        type={incomingCall.type}
-        onAccept={handleAcceptCall}
-        onReject={handleRejectCall}
-      />
 
       <CustomPopupModal
         ref={modalRef}

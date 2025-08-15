@@ -46,6 +46,13 @@ function calcDurationSec(d: CurrentCallData) {
 }
 
 function emitCallEnded(d: CurrentCallData, missed = false) {
+  console.log(
+    'emitCallEnded',
+    d,
+    missed,
+    !!socketInstance,
+    socketInstance?.connected,
+  );
   socketInstance?.emit('callEnded', {
     roomId: d.roomId,
     senderId: d.selfId,
@@ -77,24 +84,27 @@ export async function setupCallKeep() {
         callType: currentCallData.callType ?? 'video',
       });
 
+      // Chuyển sang màn hình gọi
+      navigationRef.current?.navigate('ZegoCallScreen', {
+        callUUID,
+        isIncoming: !currentCallData.isCaller,
+        userID: currentCallData.peerId ?? '',
+        userName: currentCallData.peerName ?? '',
+        callID: currentCallData.roomId,
+        image: 'https://link-to-avatar', // có thể thay avatar thật
+        callType: currentCallData.callType,
+        isCaller: currentCallData.isCaller,
+      });
+
+      // Đóng UI CallKeep
       closeCallKeepUI(callUUID);
     }
-
-    navigationRef.current?.navigate('ZegoCallScreen', {
-      callUUID,
-      isIncoming: true,
-      userID: currentCallData?.peerId ?? 'remote-user-id',
-      userName: currentCallData?.peerName ?? 'remote-user-name',
-      callID: currentCallData?.roomId ?? callUUID,
-      image: 'https://link-to-avatar',
-      isCaller: false,
-    });
   });
 
   RNCallKeep.addEventListener('endCall', ({callUUID}) => {
-    if (currentCallData?.uuid && callUUID !== currentCallData.uuid) {
-      return;
-    }
+    console.log('endCall', callUUID);
+    // Không phải cuộc gọi hiện tại thì bỏ qua
+    if (currentCallData?.uuid && callUUID !== currentCallData.uuid) return;
 
     if (suppressNextEndEvent) {
       suppressNextEndEvent = false;
