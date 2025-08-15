@@ -73,6 +73,7 @@ export async function setupCallKeep() {
   await RNCallKeep.setup(options);
   RNCallKeep.setAvailable(true);
 
+  // ====== CALLEE trả lời từ UI CallKeep ======
   RNCallKeep.addEventListener('answerCall', ({callUUID}) => {
     if (currentCallData) {
       currentCallData.isAnswered = true;
@@ -91,7 +92,7 @@ export async function setupCallKeep() {
         userID: currentCallData.peerId ?? '',
         userName: currentCallData.peerName ?? '',
         callID: currentCallData.roomId,
-        image: 'https://link-to-avatar', // có thể thay avatar thật
+        image: 'https://link-to-avatar',
         callType: currentCallData.callType,
         isCaller: currentCallData.isCaller,
       });
@@ -101,6 +102,7 @@ export async function setupCallKeep() {
     }
   });
 
+  // ====== Caller hoặc Callee bấm nút End Call trên UI CallKeep ======
   RNCallKeep.addEventListener('endCall', ({callUUID}) => {
     console.log('endCall', callUUID);
     // Không phải cuộc gọi hiện tại thì bỏ qua
@@ -261,19 +263,22 @@ function onUserJoinedCall({
   userId: string;
   callType: CallType;
 }) {
+  // Caller nhận sự kiện callee đã nhấc máy
   if (currentCallData?.isCaller && currentCallData.roomId === roomId) {
-    closeCallKeepUI(currentCallData.uuid);
+    closeCallKeepUI(currentCallData.uuid); // Đóng UI CallKeep ngay
     currentCallData.isAnswered = true;
     currentCallData.startTime = Date.now();
     currentCallData.callType = callType;
 
+    // Chuyển sang màn hình gọi
     navigationRef.current?.navigate('ZegoCallScreen', {
       callUUID: currentCallData.uuid,
       isIncoming: false,
       userID: userId,
-      userName: currentCallData.peerName ?? 'remote-user-name',
+      userName: currentCallData.peerName ?? '',
       callID: roomId,
       image: 'https://link-to-avatar',
+      callType,
       isCaller: true,
     });
   }
