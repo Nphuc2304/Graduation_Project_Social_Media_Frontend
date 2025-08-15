@@ -344,6 +344,7 @@ export const MessageScreen = () => {
     setLinkPreviews({});
     dispatch(clearMessages());
     setOriginalRoom(null);
+    navigation.goBack();
   }, [disconnectSocket, dispatch, navigation]);
 
   const handleLongPress = useCallback((content: Message) => {
