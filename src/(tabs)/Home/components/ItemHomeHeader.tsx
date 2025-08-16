@@ -45,7 +45,7 @@ export const ItemHomeHeader: React.FC<ItemHomeHeaderProps> = ({
             source={{uri: user.profilePic}}
           />
         </TouchableOpacity>
-        <View style={{width: '50%'}}>
+        <View>
           <Text
             numberOfLines={1}
             style={[ItemHomeStyles.textNormal, {color: textColor}]}>
@@ -54,7 +54,7 @@ export const ItemHomeHeader: React.FC<ItemHomeHeaderProps> = ({
           {musicInfo?.song ? (
             <Text
               numberOfLines={1}
-              style={[ItemHomeStyles.text, {color: textColor}]}>
+              style={[ItemHomeStyles.text, {color: textColor, width: '50%'}]}>
               {musicInfo.song}
             </Text>
           ) : null}
