@@ -37,9 +37,14 @@ let suppressNextEndEvent = false;
 
 // ==== giữ socket instance từ SocketProvider ====
 let socketInstance: Socket | null = null;
+let callkeepUserId: string | null = null;
 export function setCallKeepSocket(s: Socket | null) {
   socketInstance = s;
   if (s) wireCallSocketHandlers();
+}
+
+export function setCallKeepUserId(id: string) {
+  callkeepUserId = id;
 }
 
 // ===== helpers =====
@@ -48,13 +53,7 @@ function calcDurationSec(d: CurrentCallData) {
 }
 
 function emitCallEnded(d: CurrentCallData, missed = false) {
-  console.log(
-    'emitCallEnded',
-    d,
-    missed,
-    !!socketInstance,
-    socketInstance?.connected,
-  );
+  if (!d.roomId || !d.selfId) return;
   socketInstance?.emit('callEnded', {
     roomId: d.roomId,
     senderId: d.selfId,
@@ -142,7 +141,6 @@ export function wireCallSocketHandlers() {
 
   socketInstance.on('incomingCall', onIncomingCallFromServer);
 
-  // Khi bên kia accept → caller nhận event này để vào Zego
   socketInstance.on('callAccepted', ({roomId, userId, callType}) => {
     if (!currentCallData || currentCallData.roomId !== roomId) return;
 
@@ -150,11 +148,11 @@ export function wireCallSocketHandlers() {
     currentCallData.startTime = Date.now();
     currentCallData.callType = callType;
 
-    // Caller đóng UI CallKeep, vào Zego
+    // Caller đóng UI & vào Zego
     closeCallKeepUI(currentCallData.uuid);
     navigationRef.current?.navigate('ZegoCallScreen', {
       callUUID: currentCallData.uuid,
-      isIncoming: !currentCallData.isCaller, // caller = false
+      isIncoming: !currentCallData.isCaller, // caller = false => isIncoming=false
       userID: currentCallData.selfId,
       userName: currentCallData.peerName ?? '',
       callID: roomId,
@@ -163,7 +161,6 @@ export function wireCallSocketHandlers() {
     });
   });
 
-  // Bên kia kết thúc/cuộc gọi bị từ chối/missed
   socketInstance.on('callEnded', ({roomId}) => {
     if (!currentCallData || currentCallData.roomId !== roomId) return;
     closeCallKeepUI(currentCallData.uuid);
@@ -171,6 +168,11 @@ export function wireCallSocketHandlers() {
   });
 
   socketWired = true;
+}
+
+function getSelfId(): string {
+  const q: any = (socketInstance as any)?.io?.opts?.query;
+  return callkeepUserId || q?.userId || '';
 }
 
 export function showIncomingCall({
@@ -193,7 +195,7 @@ export function showIncomingCall({
   currentCallData = {
     uuid,
     roomId,
-    selfId,
+    selfId: getSelfId(),
     peerId: callerId,
     peerName: callerName,
     callType: hasVideo ? 'video' : 'voice',
@@ -268,14 +270,13 @@ function onIncomingCallFromServer({
   callUuid,
   callUUID,
 }: any) {
-  const selfId = currentCallData?.selfId ?? 'me';
   showIncomingCall({
-    uuid: callUuid || callUUID || uuidv4(), // <-- đọc cả 2 key
+    uuid: callUuid || callUUID || uuidv4(),
     callerName,
     handle: callerId,
     hasVideo: type === 'video',
     roomId,
-    selfId,
+    selfId: getSelfId(),
     callerId,
   });
 }
