@@ -25,7 +25,7 @@ interface MessageItemProps {
   userHandleName: string;
   chat: Message[];
   setSelectedImageUri: (uri: string | null) => void;
-  linkPreviews: {[key: number]: any};
+  linkPreviews: {[messageId: string]: any};
   onLongPress: (content: Message) => void;
   isHighlighted?: boolean;
   userC: User | null;
@@ -98,10 +98,11 @@ const MessageItemComponent: React.FC<MessageItemProps> = memo(
     }, [onLongPress, item]);
 
     const handleLinkPress = useCallback(() => {
-      if (linkPreviews[index]?.url) {
-        Linking.openURL(linkPreviews[index].url);
+      const preview = linkPreviews[item._id];
+      if (preview?.url) {
+        Linking.openURL(preview.url);
       }
-    }, [linkPreviews, index]);
+    }, [linkPreviews, item._id]);
 
     /**
      * RenderAvatar if its a OtherUserMessage
@@ -157,7 +158,7 @@ const MessageItemComponent: React.FC<MessageItemProps> = memo(
                   }}>
                   <Text
                     style={{
-                      color: color.text,
+                      color: "#fff",
                       fontSize: 12,
                       lineHeight: 16,
                       fontWeight: '400',
@@ -235,13 +236,13 @@ const MessageItemComponent: React.FC<MessageItemProps> = memo(
             <Text
               style={{
                 color: color.text,
-                textAlign: linkPreviews[index] && 'right',
+                textAlign: linkPreviews[item._id] && 'right',
                 fontSize: 14,
               }}>
               {filteredText}
             </Text>
           )}
-          {linkPreviews[index] && (
+          {linkPreviews[item._id] && (
             <TouchableOpacity
               onPress={handleLinkPress}
               onLongPress={handleLongPress}
@@ -251,9 +252,9 @@ const MessageItemComponent: React.FC<MessageItemProps> = memo(
                 marginTop: 5,
                 maxWidth: 200,
               }}>
-              {linkPreviews[index].images?.length > 0 && (
+              {linkPreviews[item._id].images?.length > 0 && (
                 <Image
-                  source={{uri: linkPreviews[index].images[0]}}
+                  source={{uri: linkPreviews[item._id].images[0]}}
                   style={{
                     width: '100%',
                     height: 140,
@@ -272,21 +273,21 @@ const MessageItemComponent: React.FC<MessageItemProps> = memo(
                 }}
                 numberOfLines={2}
                 ellipsizeMode="tail">
-                {linkPreviews[index].title}
+                {linkPreviews[item._id].title}
               </Text>
-              {linkPreviews[index].description && (
+              {linkPreviews[item._id].description && (
                 <Text
                   numberOfLines={1}
                   ellipsizeMode="tail"
                   style={{color: 'gray', fontSize: 12}}>
-                  {linkPreviews[index].description}
+                  {linkPreviews[item._id].description}
                 </Text>
               )}
               <Text
                 style={{color: '#007AFF', fontSize: 12, marginTop: 4}}
                 numberOfLines={2}
                 ellipsizeMode="tail">
-                {linkPreviews[index].url}
+                {linkPreviews[item._id].url}
               </Text>
             </TouchableOpacity>
           )}
@@ -354,7 +355,7 @@ const MessageItemComponent: React.FC<MessageItemProps> = memo(
                     : 'transparent'
                   : !isMe
                   ? color.backgroundSecondary
-                  : !linkPreviews[index] && !item.media
+                  : !linkPreviews[item._id] && !item.media
                   ? '#00BFFF'
                   : color.backgroundSecondary,
                 padding:
