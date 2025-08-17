@@ -69,9 +69,12 @@ function closeCallKeepUI(uuid?: string) {
   else if (currentCallData?.uuid) RNCallKeep.endCall(currentCallData.uuid);
 }
 
+export function isCallKeepReady() {
+  return initialized === true;
+}
+
 export async function setupCallKeep() {
   if (initialized) return;
-
 
   await RNCallKeep.setup(options);
   RNCallKeep.setAvailable(true);
@@ -87,14 +90,11 @@ export async function setupCallKeep() {
       currentCallData.isAnswered = true;
       currentCallData.startTime = Date.now();
 
-      // Join phòng call
-      socketInstance?.emit('joinCall', {
+      socketInstance?.emit('joinRoom', {
         roomId: currentCallData.roomId,
         userId: currentCallData.selfId,
-        callType: currentCallData.callType ?? 'video',
       });
 
-      // Chuyển sang màn hình gọi
       navigationRef.current?.navigate('ZegoCallScreen', {
         callUUID,
         isIncoming: !currentCallData.isCaller,
@@ -106,8 +106,28 @@ export async function setupCallKeep() {
         isCaller: currentCallData.isCaller,
       });
 
-      // Đóng UI CallKeep
       closeCallKeepUI(callUUID);
+      RNCallKeep.addEventListener('answerCall', ({callUUID}) => {
+        if (!currentCallData) return;
+        currentCallData.isAnswered = true;
+        currentCallData.startTime = Date.now();
+        socketInstance?.emit('joinCall', {
+          roomId: currentCallData.roomId,
+          userId: currentCallData.selfId,
+          callType: currentCallData.callType ?? 'video',
+        });
+        navigationRef.current?.navigate('ZegoCallScreen', {
+          callUUID,
+          isIncoming: !currentCallData.isCaller,
+          userID: currentCallData.selfId,
+          userName: currentCallData.peerName ?? '',
+          callID: currentCallData.roomId,
+          image: 'https://link-to-avatar',
+          callType: currentCallData.callType,
+          isCaller: currentCallData.isCaller,
+        });
+        closeCallKeepUI(callUUID);
+      });
     }
 
     initialized = true;
@@ -139,9 +159,6 @@ export function wireCallSocketHandlers() {
   if (socketWired || !socketInstance) return;
 
   socketInstance.on('incomingCall', onIncomingCallFromServer);
-  socketInstance.on('userJoinedCall', onUserJoinedCall);
-  socketInstance.on('userLeftCall', onUserLeftCall);
-  socketInstance.on('callEnded', onCallEndedFromServer);
   socketWired = true;
 }
 
@@ -227,9 +244,6 @@ export function endAllCalls() {
 export function teardownCallKeep() {
   if (socketInstance && socketWired) {
     socketInstance.off('incomingCall', onIncomingCallFromServer);
-    socketInstance.off('userJoinedCall', onUserJoinedCall);
-    socketInstance.off('userLeftCall', onUserLeftCall);
-    socketInstance.off('callEnded', onCallEndedFromServer);
     socketWired = false;
   }
 }
