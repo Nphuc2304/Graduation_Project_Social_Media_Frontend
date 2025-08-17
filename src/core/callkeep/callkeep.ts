@@ -39,6 +39,7 @@ let suppressNextEndEvent = false;
 let socketInstance: Socket | null = null;
 export function setCallKeepSocket(s: Socket | null) {
   socketInstance = s;
+  if (s) wireCallSocketHandlers();
 }
 
 // ===== helpers =====
@@ -95,6 +96,12 @@ export async function setupCallKeep() {
       userId: currentCallData.selfId,
     });
 
+    socketInstance?.emit('acceptCall', {
+      roomId: currentCallData.roomId,
+      userId: currentCallData.selfId,
+      callType: currentCallData.callType ?? 'video',
+    });
+
     navigationRef.current?.navigate('ZegoCallScreen', {
       callUUID,
       isIncoming: !currentCallData.isCaller,
@@ -134,6 +141,35 @@ export function wireCallSocketHandlers() {
   if (socketWired || !socketInstance) return;
 
   socketInstance.on('incomingCall', onIncomingCallFromServer);
+
+  // Khi bên kia accept → caller nhận event này để vào Zego
+  socketInstance.on('callAccepted', ({roomId, userId, callType}) => {
+    if (!currentCallData || currentCallData.roomId !== roomId) return;
+
+    currentCallData.isAnswered = true;
+    currentCallData.startTime = Date.now();
+    currentCallData.callType = callType;
+
+    // Caller đóng UI CallKeep, vào Zego
+    closeCallKeepUI(currentCallData.uuid);
+    navigationRef.current?.navigate('ZegoCallScreen', {
+      callUUID: currentCallData.uuid,
+      isIncoming: !currentCallData.isCaller, // caller = false
+      userID: currentCallData.selfId,
+      userName: currentCallData.peerName ?? '',
+      callID: roomId,
+      callType,
+      isCaller: currentCallData.isCaller,
+    });
+  });
+
+  // Bên kia kết thúc/cuộc gọi bị từ chối/missed
+  socketInstance.on('callEnded', ({roomId}) => {
+    if (!currentCallData || currentCallData.roomId !== roomId) return;
+    closeCallKeepUI(currentCallData.uuid);
+    currentCallData = null;
+  });
+
   socketWired = true;
 }
 
@@ -230,16 +266,11 @@ function onIncomingCallFromServer({
   type,
   roomId,
   callUuid,
-}: {
-  callerId: string;
-  callerName: string;
-  type: CallType;
-  roomId: string;
-  callUuid?: string;
-}) {
+  callUUID,
+}: any) {
   const selfId = currentCallData?.selfId ?? 'me';
   showIncomingCall({
-    uuid: callUuid || uuidv4(),
+    uuid: callUuid || callUUID || uuidv4(), // <-- đọc cả 2 key
     callerName,
     handle: callerId,
     hasVideo: type === 'video',
