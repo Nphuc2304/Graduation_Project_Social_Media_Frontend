@@ -22,26 +22,17 @@ export const SocketProvider = ({children}: {children: React.ReactNode}) => {
   const [socket, setSocket] = useState<Socket | null>(null);
   const user = useSelector((state: RootState) => state.user.user);
 
-  const connectToSocket = (roomId: string) => {
-    if (!user?._id || !roomId) return;
-
-    // Ngắt kết nối socket cũ nếu có
-    if (socketRef.current) {
-      socketRef.current.disconnect();
-    }
+  const connectToSocket = () => {
+    if (!user?._id) return;
+    if (socketRef.current) return;
 
     const newSocket = io(BASE_URL, {
       transports: ['websocket'],
-      query: {
-        userId: user._id,
-        roomId,
-      },
+      query: {userId: user._id},
     });
 
     newSocket.on('connect', () => {
       console.log('✅ Socket connected!');
-      newSocket.emit('joinRoom', {roomId});
-
       setCallKeepSocket(newSocket);
     });
 
