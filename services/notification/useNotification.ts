@@ -4,46 +4,65 @@ import {
   onMessageListener,
   onNotificationOpenedApp,
 } from './notification';
-import {AppDispatch} from '@services/store';
+import {AppDispatch, RootState} from '@services/store';
 import {setIsReadNoti} from '@services/notificationRedux/notificationReducer';
-import {useDispatch} from 'react-redux';
+import {useDispatch, useSelector} from 'react-redux';
 import {
   setupCallKeep,
   showIncomingCall,
+  setCallKeepUserId,
 } from '../../src/core/callkeep/callkeep';
+import {useSocket} from '@services/SocketContext';
 
 export const useNotificationHandler = (onNavigate: (data: any) => void) => {
   const [modalData, setModalData] = useState<any | null>(null);
   const dispatch = useDispatch<AppDispatch>();
+  const {connectToSocket} = useSocket();
+  const user = useSelector((s: RootState) => s.user.user);
 
-  const handleMessage = useCallback(async (remoteMessage: any) => {
-    if (remoteMessage?.data?.type === 'incoming_call') {
+  const handleIncomingCallPush = useCallback(
+    async (data: any) => {
+      // BE gửi: type, callId, callUuid, userId, userName, callType, roomId, image?
       await setupCallKeep();
-      showIncomingCall({
-        callerName: remoteMessage.data.callerName ?? 'Caller',
-        handle: remoteMessage.data.handle ?? 'number',
-        hasVideo: remoteMessage.data.hasVideo === 'true',
-      });
-      return; // không show modal nữa
-    }
+      connectToSocket();
+      if (user?._id) setCallKeepUserId(user._id);
 
-    setModalData({
-      title: remoteMessage.notification?.title,
-      body: remoteMessage.notification?.body,
-      data: remoteMessage.data,
-    });
-    dispatch(setIsReadNoti(true));
-  }, []);
+      showIncomingCall({
+        uuid: data.callUuid, // ← dùng callUuid
+        callerName: data.userName || 'Cuộc gọi tới',
+        handle: data.userId, // ← callerId
+        hasVideo: (data.callType || 'video') === 'video',
+        roomId: data.callId || data.roomId, // ← id phòng gọi
+        callerId: data.userId,
+        image: data.image,
+      });
+    },
+    [connectToSocket, user?._id],
+  );
+
+  const handleMessage = useCallback(
+    async (remoteMessage: any) => {
+      const t = remoteMessage?.data?.type;
+      if (t === 'incoming_call') {
+        await handleIncomingCallPush(remoteMessage.data);
+        return; // không show modal
+      }
+
+      setModalData({
+        title: remoteMessage.notification?.title,
+        body: remoteMessage.notification?.body,
+        data: remoteMessage.data,
+      });
+      dispatch(setIsReadNoti(true));
+    },
+    [dispatch, handleIncomingCallPush],
+  );
 
   const handleNavigate = useCallback(
     async (remoteMessage: any) => {
-      if (remoteMessage?.data?.type === 'incoming_call') {
-        await setupCallKeep();
-        showIncomingCall({
-          callerName: remoteMessage.data.callerName ?? 'Caller',
-          handle: remoteMessage.data.handle ?? 'number',
-          hasVideo: remoteMessage.data.hasVideo === 'true',
-        });
+      const t = remoteMessage?.data?.type;
+      if (t === 'incoming_call') {
+        await handleIncomingCallPush(remoteMessage.data);
         return;
       }
 
@@ -52,7 +71,7 @@ export const useNotificationHandler = (onNavigate: (data: any) => void) => {
         dispatch(setIsReadNoti(false));
       }
     },
-    [onNavigate],
+    [dispatch, onNavigate, handleIncomingCallPush],
   );
 
   useEffect(() => {
