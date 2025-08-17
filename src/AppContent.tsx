@@ -12,8 +12,14 @@ import {useNotificationHandler} from '@services/notification/useNotification';
 import {navigationRef} from './NavigationService';
 import {Linking, PermissionsAndroid, Platform} from 'react-native';
 import {navigateFromUrl} from './core/deeplinkHandler';
-import {setupCallKeep} from './core/callkeep/callkeep';
-import { useSocket } from '@services/SocketContext';
+import {
+  setCallKeepUserId,
+  setupCallKeep,
+  showIncomingCall,
+} from './core/callkeep/callkeep';
+import {useSocket} from '@services/SocketContext';
+import {useSelector} from 'react-redux';
+import {RootState} from '@services/store';
 
 async function requestCallPermissions() {
   if (Platform.OS !== 'android') return;
@@ -37,7 +43,8 @@ async function requestCallPermissions() {
 }
 
 const AppContent = () => {
-  const { connectToSocket} = useSocket();
+  const user = useSelector((state: RootState) => state.user.user);
+  const {connectToSocket} = useSocket();
   useEffect(() => {
     createNotificationChannel();
   }, []);
@@ -72,16 +79,20 @@ const AppContent = () => {
         });
         break;
       case 'incoming_call':
-      case 'call':
-        navigationRef.navigate('ZegoCallScreen', {
-          callID: data.callId || data.roomId,
-          userID: data.userId,
-          userName: data.userName,
-          image: data.image,
-          isCaller: false,
-          callType: data.callType || 'video',
+      case 'call': {
+        connectToSocket();
+        if (user?._id) setCallKeepUserId(user._id);
+        showIncomingCall({
+          uuid: modalData.data.callUuid,
+          callerName: modalData.data.userName || 'Cuộc gọi tới',
+          handle: modalData.data.userId,
+          hasVideo: (modalData.data.callType || 'video') === 'video',
+          roomId: modalData.data.callId || modalData.data.roomId,
+          callerId: modalData.data.userId,
+          image: modalData.data.image,
         });
         break;
+      }
       case 'message':
         navigationRef.navigate('MessageScreen', {
           room: data?.roomId,
