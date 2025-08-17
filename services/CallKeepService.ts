@@ -77,7 +77,7 @@ const options = {
     cancelButton: 'Hủy',
     okButton: 'OK',
     additionalPermissions: [],
-    selfManaged: true,
+    // selfManaged: true,
     foregroundService: {
       channelId: 'com.cirla.call',
       channelName: 'Cuộc gọi Cirla',

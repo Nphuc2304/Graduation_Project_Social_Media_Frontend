@@ -21,7 +21,7 @@ type CurrentCallData = {
 const options: IOptions = {
   ios: {appName: 'YourApp', supportsVideo: true},
   android: {
-    selfManaged: true,
+    // selfManaged: true,
     alertTitle: 'Quyền gọi',
     alertDescription: 'Ứng dụng cần quyền để hiển thị cuộc gọi.',
     cancelButton: 'Huỷ',
