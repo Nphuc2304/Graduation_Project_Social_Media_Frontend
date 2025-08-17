@@ -3,7 +3,11 @@ import {io, Socket} from 'socket.io-client';
 import {BASE_URL} from '../services/api';
 import {useSelector} from 'react-redux';
 import {RootState} from '../services/store';
-import {setCallKeepSocket, wireCallSocketHandlers} from '../src/core/callkeep/callkeep';
+import {
+  setCallKeepSocket,
+  setCallKeepUserId,
+  wireCallSocketHandlers,
+} from '../src/core/callkeep/callkeep';
 
 interface SocketContextType {
   socket: Socket | null;
@@ -41,6 +45,7 @@ export const SocketProvider = ({children}: {children: React.ReactNode}) => {
       console.log('✅ Socket connected!');
       setCallKeepSocket(newSocket);
       wireCallSocketHandlers();
+      setCallKeepUserId(user._id);
     });
 
     newSocket.on('disconnect', () => {
