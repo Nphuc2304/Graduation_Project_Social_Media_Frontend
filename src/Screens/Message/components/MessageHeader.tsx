@@ -94,8 +94,10 @@ const MessageHeader: React.FC<MessageHeaderProps> = ({
       hasVideo: true,
       roomId: room._id,
       selfId: userC._id,
+      selfName: userC.username ?? 'Người gọi',
       calleeId: user1._id,
-      calleeName: user1.username,
+      calleeName: user1.username ?? 'Người nhận',
+      image: user1.profilePic,
     });
 
     emitGlobal('incomingCall', {
@@ -113,15 +115,15 @@ const MessageHeader: React.FC<MessageHeaderProps> = ({
   const handleVoiceCall = () => {
     if (!room?._id || !userC || !user1) return;
     Vibration.vibrate(50);
-
     const callUUID = startOutgoingCall({
       uuid: uuidv4(),
       callee: user1.username ?? 'Người nhận',
       hasVideo: false,
       roomId: room._id,
       selfId: userC._id,
+      selfName: userC.username ?? 'Người gọi',
       calleeId: user1._id,
-      calleeName: user1.username,
+      calleeName: user1.username ?? 'Người nhận',
     });
 
     emitGlobal('incomingCall', {
