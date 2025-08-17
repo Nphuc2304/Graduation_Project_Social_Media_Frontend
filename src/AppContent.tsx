@@ -13,6 +13,7 @@ import {navigationRef} from './NavigationService';
 import {Linking, PermissionsAndroid, Platform} from 'react-native';
 import {navigateFromUrl} from './core/deeplinkHandler';
 import {setupCallKeep} from './core/callkeep/callkeep';
+import { useSocket } from '@services/SocketContext';
 
 async function requestCallPermissions() {
   if (Platform.OS !== 'android') return;
@@ -36,8 +37,13 @@ async function requestCallPermissions() {
 }
 
 const AppContent = () => {
+  const { connectToSocket} = useSocket();
   useEffect(() => {
     createNotificationChannel();
+  }, []);
+
+  useEffect(() => {
+    connectToSocket();
   }, []);
 
   const {modalData, clearModal} = useNotificationHandler(data => {

@@ -7,14 +7,18 @@ import {setCallKeepSocket} from '../src/core/callkeep/callkeep';
 
 interface SocketContextType {
   socket: Socket | null;
-  connectToSocket: (roomId: string) => void;
+  connectToSocket: () => void;
   disconnectSocket: () => void;
+  joinRoom: (roomId: string) => void;
+  leaveRoom: (roomId: string) => void;
 }
 
 const SocketContext = createContext<SocketContextType>({
   socket: null,
   connectToSocket: () => {},
   disconnectSocket: () => {},
+  joinRoom: () => {},
+  leaveRoom: () => {},
 });
 
 export const SocketProvider = ({children}: {children: React.ReactNode}) => {
@@ -24,7 +28,9 @@ export const SocketProvider = ({children}: {children: React.ReactNode}) => {
 
   const connectToSocket = () => {
     if (!user?._id) return;
-    if (socketRef.current) return;
+
+    // Nếu đã có socket và còn sống thì không connect lại
+    if (socketRef.current?.connected) return;
 
     const newSocket = io(BASE_URL, {
       transports: ['websocket'],
@@ -34,6 +40,10 @@ export const SocketProvider = ({children}: {children: React.ReactNode}) => {
     newSocket.on('connect', () => {
       console.log('✅ Socket connected!');
       setCallKeepSocket(newSocket);
+    });
+
+    newSocket.on('disconnect', () => {
+      console.log('❌ Socket disconnected!');
     });
 
     newSocket.on('connect_error', err => {
@@ -49,14 +59,28 @@ export const SocketProvider = ({children}: {children: React.ReactNode}) => {
       socketRef.current.disconnect();
       socketRef.current = null;
       setSocket(null);
-      console.log('🔌 Socket disconnected.');
-
+      console.log('🔌 Socket manually disconnected.');
       setCallKeepSocket(null);
     }
   };
 
+  const joinRoom = (roomId: string) => {
+    if (socketRef.current && socketRef.current.connected) {
+      socketRef.current.emit('joinRoom', {roomId, userId: user?._id});
+      console.log('➡️ joinRoom:', roomId);
+    }
+  };
+
+  const leaveRoom = (roomId: string) => {
+    if (socketRef.current && socketRef.current.connected) {
+      socketRef.current.emit('leaveRoom', roomId);
+      console.log('⬅️ leaveRoom:', roomId);
+    }
+  };
+
   return (
-    <SocketContext.Provider value={{socket, connectToSocket, disconnectSocket}}>
+    <SocketContext.Provider
+      value={{socket, connectToSocket, disconnectSocket, joinRoom, leaveRoom}}>
       {children}
     </SocketContext.Provider>
   );

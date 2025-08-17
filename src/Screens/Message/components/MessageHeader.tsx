@@ -8,7 +8,6 @@ import {
   Vibration,
 } from 'react-native';
 import {Colors} from '@assets/color/Colors';
-import IncomingCallModal from '../../../../components/IncomingCallModal';
 import {useSocket} from '@services/SocketContext';
 import {ArrowLeft, Phone, Video, AlertCircle} from 'lucide-react-native';
 import {Room, RoomUser} from '@services/roomRedux/roomType';
@@ -19,10 +18,7 @@ import CustomPopupModal, {
 } from '../../../../components/Global/CustomPopupModal';
 import 'react-native-get-random-values';
 import {v4 as uuidv4} from 'uuid';
-import {
-  endCall,
-  startOutgoingCall,
-} from '../../../../src/core/callkeep/callkeep';
+import {startOutgoingCall} from '../../../../src/core/callkeep/callkeep';
 
 interface MessageHeaderProps {
   user1?: RoomUser;
@@ -48,7 +44,7 @@ const MessageHeader: React.FC<MessageHeaderProps> = ({
   const {theme} = useTheme();
   const color = Colors[theme];
   const modalRef = useRef<CustomPopupModalRef>(null);
-  const {socket, connectToSocket} = useSocket();
+  const {socket} = useSocket();
   const [incomingCall, setIncomingCall] = useState({
     visible: false,
     callerId: '',
@@ -58,12 +54,6 @@ const MessageHeader: React.FC<MessageHeaderProps> = ({
     callUUID: '',
     roomId: '',
   });
-
-  useEffect(() => {
-    if (room?._id) {
-      connectToSocket(room._id);
-    }
-  }, [room?._id]);
 
   useEffect(() => {
     if (!socket) return;

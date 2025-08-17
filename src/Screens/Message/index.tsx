@@ -119,7 +119,7 @@ export const MessageScreen = () => {
   const roomMember2 = filteredUsers?.[1];
 
   const {showUploadModal, hideUploadModal, setProgress} = useUploadProgress();
-  const {socket, connectToSocket, disconnectSocket} = useSocket();
+  const {socket, disconnectSocket} = useSocket();
 
   useEffect(() => {
     const checkRelation = async () => {
@@ -149,9 +149,12 @@ export const MessageScreen = () => {
   }, [messages, roomId]);
 
   useEffect(() => {
-    connectToSocket(roomId);
-    return () => disconnectSocket();
-  }, [roomId]);
+    if (!socket || !roomId || !userC?._id) return;
+    socket.emit('joinRoom', {roomId, userId: userC._id});
+    return () => {
+      socket.emit('leaveRoom', roomId);
+    };
+  }, [socket, roomId, userC?._id]);
 
   useEffect(() => {
     if (!socket) return;
@@ -337,7 +340,6 @@ export const MessageScreen = () => {
   }, [rooms, dispatch]);
 
   const handleGoBack = useCallback(() => {
-    disconnectSocket();
     setChat([]);
     setMessage('');
     setSelectedImageUri(null);
@@ -345,7 +347,7 @@ export const MessageScreen = () => {
     dispatch(clearMessages());
     setOriginalRoom(null);
     navigation.goBack();
-  }, [disconnectSocket, dispatch, navigation]);
+  }, [dispatch, navigation]);
 
   const handleLongPress = useCallback((content: Message) => {
     setModalVisible(true);
