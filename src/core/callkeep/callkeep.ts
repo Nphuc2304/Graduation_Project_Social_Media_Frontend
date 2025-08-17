@@ -69,6 +69,30 @@ function closeCallKeepUI(uuid?: string) {
   else if (currentCallData?.uuid) RNCallKeep.endCall(currentCallData.uuid);
 }
 
+let isNavigatingToCall = false;
+
+function safeNavigateToZego(d: CurrentCallData) {
+  if (isNavigatingToCall) return;
+  isNavigatingToCall = true;
+
+  // 1) Đóng UI CallKeep trước
+  closeCallKeepUI(d.uuid);
+
+  // 2) Delay ngắn để native hoàn tất dismiss
+  setTimeout(() => {
+    navigationRef.current?.navigate('ZegoCallScreen', {
+      selfId: d.selfId,
+      selfName: d.selfName,
+      peerId: d.peerId,
+      peerName: d.peerName,
+      callID: d.roomId,
+      image: d.image ?? null,
+      isCaller: d.isCaller,
+      callType: d.callType,
+    });
+  }, 250);
+}
+
 export async function setupCallKeep() {
   if (initialized) return;
 
@@ -77,35 +101,21 @@ export async function setupCallKeep() {
 
   RNCallKeep.addEventListener('answerCall', ({callUUID}) => {
     if (!currentCallData) return;
-
     currentCallData.isAnswered = true;
     currentCallData.startTime = Date.now();
 
-    // join room + báo accept
     socketInstance?.emit('joinRoom', {
       roomId: currentCallData.roomId,
       userId: currentCallData.selfId,
     });
-
     socketInstance?.emit('acceptCall', {
       roomId: currentCallData.roomId,
       userId: currentCallData.selfId,
       callType: currentCallData.callType,
     });
 
-    // điều hướng vào Zego
-    navigationRef.current?.navigate('ZegoCallScreen', {
-      selfId: currentCallData.selfId,
-      selfName: currentCallData.selfName,
-      peerId: currentCallData.peerId,
-      peerName: currentCallData.peerName,
-      callID: currentCallData.roomId,
-      image: currentCallData.image ?? null,
-      isCaller: currentCallData.isCaller,
-      callType: currentCallData.callType,
-    });
-
-    closeCallKeepUI(callUUID);
+    // Đổi: dùng safeNavigateToZego (đã đóng UI + delay)
+    safeNavigateToZego(currentCallData);
   });
 
   RNCallKeep.addEventListener('endCall', ({callUUID}) => {
@@ -133,23 +143,14 @@ export function wireCallSocketHandlers() {
 
   socketInstance.on('callAccepted', ({roomId, userId, callType}) => {
     if (!currentCallData || currentCallData.roomId !== roomId) return;
+    if (currentCallData.isAnswered) return; // đã điều hướng rồi
 
     currentCallData.isAnswered = true;
     currentCallData.startTime = Date.now();
     currentCallData.callType = callType;
 
-    // caller: đóng UI → vào Zego
-    closeCallKeepUI(currentCallData.uuid);
-    navigationRef.current?.navigate('ZegoCallScreen', {
-      selfId: currentCallData.selfId,
-      selfName: currentCallData.selfName,
-      peerId: currentCallData.peerId,
-      peerName: currentCallData.peerName,
-      callID: roomId,
-      image: currentCallData.image ?? null,
-      isCaller: currentCallData.isCaller,
-      callType,
-    });
+    // Caller điều hướng an toàn
+    safeNavigateToZego(currentCallData);
   });
 
   socketInstance.on('callEnded', ({roomId}) => {
