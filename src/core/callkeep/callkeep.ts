@@ -10,9 +10,11 @@ type CurrentCallData = {
   uuid: string;
   roomId: string;
   selfId: string;
-  peerId?: string;
-  peerName?: string;
-  callType?: CallType;
+  selfName: string;
+  peerId: string;
+  peerName: string;
+  image?: string;
+  callType: CallType;
   isCaller: boolean;
   isAnswered?: boolean;
   startTime?: number;
@@ -21,7 +23,6 @@ type CurrentCallData = {
 const options: IOptions = {
   ios: {appName: 'YourApp', supportsVideo: true},
   android: {
-    // selfManaged: true,
     alertTitle: 'Quyền gọi',
     alertDescription: 'Ứng dụng cần quyền để hiển thị cuộc gọi.',
     cancelButton: 'Huỷ',
@@ -35,9 +36,9 @@ let socketWired = false;
 let currentCallData: CurrentCallData | null = null;
 let suppressNextEndEvent = false;
 
-// ==== giữ socket instance từ SocketProvider ====
 let socketInstance: Socket | null = null;
 let callkeepUserId: string | null = null;
+
 export function setCallKeepSocket(s: Socket | null) {
   socketInstance = s;
   if (s) wireCallSocketHandlers();
@@ -47,7 +48,6 @@ export function setCallKeepUserId(id: string) {
   callkeepUserId = id;
 }
 
-// ===== helpers =====
 function calcDurationSec(d: CurrentCallData) {
   return d.startTime ? Math.floor((Date.now() - d.startTime) / 1000) : 0;
 }
@@ -59,7 +59,7 @@ function emitCallEnded(d: CurrentCallData, missed = false) {
     senderId: d.selfId,
     missed,
     duration: missed ? 0 : calcDurationSec(d),
-    callType: d.callType ?? 'video',
+    callType: d.callType,
   });
 }
 
@@ -69,20 +69,11 @@ function closeCallKeepUI(uuid?: string) {
   else if (currentCallData?.uuid) RNCallKeep.endCall(currentCallData.uuid);
 }
 
-export function isCallKeepReady() {
-  return initialized === true;
-}
-
 export async function setupCallKeep() {
   if (initialized) return;
 
   await RNCallKeep.setup(options);
   RNCallKeep.setAvailable(true);
-
-  try {
-    RNCallKeep.removeEventListener('answerCall');
-    RNCallKeep.removeEventListener('endCall');
-  } catch {}
 
   RNCallKeep.addEventListener('answerCall', ({callUUID}) => {
     if (!currentCallData) return;
@@ -90,6 +81,7 @@ export async function setupCallKeep() {
     currentCallData.isAnswered = true;
     currentCallData.startTime = Date.now();
 
+    // join room + báo accept
     socketInstance?.emit('joinRoom', {
       roomId: currentCallData.roomId,
       userId: currentCallData.selfId,
@@ -98,26 +90,25 @@ export async function setupCallKeep() {
     socketInstance?.emit('acceptCall', {
       roomId: currentCallData.roomId,
       userId: currentCallData.selfId,
-      callType: currentCallData.callType ?? 'video',
+      callType: currentCallData.callType,
     });
 
+    // điều hướng vào Zego
     navigationRef.current?.navigate('ZegoCallScreen', {
-      callUUID,
-      isIncoming: !currentCallData.isCaller,
-      userID: currentCallData.selfId,
-      userName: currentCallData.peerName ?? '',
+      selfId: currentCallData.selfId,
+      selfName: currentCallData.selfName,
+      peerId: currentCallData.peerId,
+      peerName: currentCallData.peerName,
       callID: currentCallData.roomId,
-      image: 'https://link-to-avatar',
-      callType: currentCallData.callType,
+      image: currentCallData.image ?? null,
       isCaller: currentCallData.isCaller,
+      callType: currentCallData.callType,
     });
 
     closeCallKeepUI(callUUID);
   });
 
-  // ====== End Call ======
   RNCallKeep.addEventListener('endCall', ({callUUID}) => {
-    console.log('endCall', callUUID);
     if (currentCallData?.uuid && callUUID !== currentCallData.uuid) return;
 
     if (suppressNextEndEvent) {
@@ -129,7 +120,6 @@ export async function setupCallKeep() {
     if (currentCallData) {
       emitCallEnded(currentCallData, !currentCallData.isAnswered);
     }
-
     currentCallData = null;
   });
 
@@ -148,16 +138,17 @@ export function wireCallSocketHandlers() {
     currentCallData.startTime = Date.now();
     currentCallData.callType = callType;
 
-    // Caller đóng UI & vào Zego
+    // caller: đóng UI → vào Zego
     closeCallKeepUI(currentCallData.uuid);
     navigationRef.current?.navigate('ZegoCallScreen', {
-      callUUID: currentCallData.uuid,
-      isIncoming: !currentCallData.isCaller, // caller = false => isIncoming=false
-      userID: currentCallData.selfId,
-      userName: currentCallData.peerName ?? '',
+      selfId: currentCallData.selfId,
+      selfName: currentCallData.selfName,
+      peerId: currentCallData.peerId,
+      peerName: currentCallData.peerName,
       callID: roomId,
-      callType,
+      image: currentCallData.image ?? null,
       isCaller: currentCallData.isCaller,
+      callType,
     });
   });
 
@@ -177,27 +168,29 @@ function getSelfId(): string {
 
 export function showIncomingCall({
   uuid = uuidv4(),
-  callerName = 'Người gọi',
+  callerName,
   handle = 'number',
   hasVideo = true,
   roomId,
-  selfId,
   callerId,
+  image,
 }: {
   uuid?: string;
-  callerName?: string;
+  callerName: string;
   handle?: string;
   hasVideo?: boolean;
   roomId: string;
-  selfId: string;
   callerId: string;
+  image?: string;
 }) {
   currentCallData = {
     uuid,
     roomId,
     selfId: getSelfId(),
+    selfName: 'Me', // set từ profile context
     peerId: callerId,
     peerName: callerName,
+    image,
     callType: hasVideo ? 'video' : 'voice',
     isCaller: false,
     isAnswered: false,
@@ -208,32 +201,38 @@ export function showIncomingCall({
 
 export function startOutgoingCall({
   uuid = uuidv4(),
-  callee = 'number',
+  callee,
   hasVideo = true,
   roomId,
   selfId,
+  selfName,
   calleeId,
   calleeName,
+  image,
 }: {
   uuid?: string;
-  callee?: string;
+  callee: string;
   hasVideo?: boolean;
   roomId: string;
   selfId: string;
+  selfName: string;
   calleeId: string;
-  calleeName?: string;
+  calleeName: string;
+  image?: string;
 }) {
   currentCallData = {
     uuid,
     roomId,
     selfId,
+    selfName,
     peerId: calleeId,
     peerName: calleeName,
+    image,
     callType: hasVideo ? 'video' : 'voice',
     isCaller: true,
     isAnswered: false,
   };
-  RNCallKeep.startCall(uuid, callee, callee, 'number', hasVideo);
+  RNCallKeep.startCall(uuid, callee, calleeName, 'number', hasVideo);
   return uuid;
 }
 
@@ -242,9 +241,7 @@ export function endCall(uuid?: string) {
   const id = uuid ?? d?.uuid;
   if (!id) return;
 
-  if (d) {
-    emitCallEnded(d, !d.isAnswered);
-  }
+  if (d) emitCallEnded(d, !d.isAnswered);
   suppressNextEndEvent = true;
   RNCallKeep.endCall(id);
   currentCallData = null;
@@ -261,22 +258,21 @@ export function teardownCallKeep() {
   }
 }
 
-// ===== socket handlers =====
 function onIncomingCallFromServer({
   callerId,
   callerName,
   type,
   roomId,
   callUuid,
-  callUUID,
+  image,
 }: any) {
   showIncomingCall({
-    uuid: callUuid || callUUID || uuidv4(),
+    uuid: callUuid || uuidv4(),
     callerName,
     handle: callerId,
     hasVideo: type === 'video',
     roomId,
-    selfId: getSelfId(),
     callerId,
+    image,
   });
 }
