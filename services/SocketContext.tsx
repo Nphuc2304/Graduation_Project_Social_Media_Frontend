@@ -44,8 +44,8 @@ export const SocketProvider = ({children}: {children: React.ReactNode}) => {
     newSocket.on('connect', () => {
       console.log('✅ Socket connected!');
       setCallKeepSocket(newSocket);
-      wireCallSocketHandlers();
       setCallKeepUserId(user._id);
+      wireCallSocketHandlers();
     });
 
     newSocket.on('disconnect', () => {
