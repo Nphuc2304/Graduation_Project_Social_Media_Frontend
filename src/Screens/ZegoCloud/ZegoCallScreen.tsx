@@ -7,21 +7,30 @@ import {useSocket} from '../../../services/SocketContext';
 import {GlobalAlertManager} from '../../../components/Global/AlertModal';
 
 export default function ZegoCallScreen({route}: any) {
-  const {userID, userName, callID, image, isCaller} = route.params;
+  const {
+    selfId,
+    selfName,
+    peerId,
+    peerName,
+    callID,
+    image,
+    isCaller,
+    callType,
+  } = route.params;
   const navigation = useNavigation();
   const {socket} = useSocket();
   const [callEnded, setCallEnded] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
 
-  const handleCallCancelled = () => {
+  const handleCallEnd = () => {
     if (callEnded) return;
     setCallEnded(true);
 
-    if (socket && isCaller) {
+    if (socket) {
       socket.emit('callEnded', {
         roomId: callID,
-        senderId: userID,
-        callType: 'video',
+        senderId: selfId,
+        callType,
         missed: false,
         duration: callDuration,
       });
@@ -33,20 +42,17 @@ export default function ZegoCallScreen({route}: any) {
   useEffect(() => {
     if (!socket) return;
 
-    socket.on('callCancelled', handleCallCancelled);
+    socket.on('callEnded', handleCallEnd);
     return () => {
-      socket.off('callCancelled', handleCallCancelled);
+      socket.off('callEnded', handleCallEnd);
     };
   }, [socket]);
 
   useEffect(() => {
     const start = Date.now();
-
     const interval = setInterval(() => {
-      const duration = Math.floor((Date.now() - start) / 1000);
-      setCallDuration(duration);
+      setCallDuration(Math.floor((Date.now() - start) / 1000));
     }, 1000);
-
     return () => clearInterval(interval);
   }, []);
 
@@ -55,21 +61,19 @@ export default function ZegoCallScreen({route}: any) {
       <ZegoUIKitPrebuiltCall
         appID={CallAppID}
         appSign={CallAppSign}
-        userID={userID}
-        userName={userName}
+        userID={selfId} // ID của chính mình
+        userName={selfName}
         callID={callID}
         config={{
-          turnOnCameraWhenJoining: true,
+          turnOnCameraWhenJoining: callType === 'video',
           turnOnMicrophoneWhenJoining: true,
-          useSpeakerWhenJoining: true,
+          useSpeakerWhenJoining: callType === 'video',
           layout: 'GROUP',
-          showCameraToggleButton: true,
+          showCameraToggleButton: callType === 'video',
           showMicrophoneToggleButton: true,
           showAudioOutputButton: true,
           showEndCallButton: true,
-          onCallEnd: () => {
-            handleCallCancelled();
-          },
+          onCallEnd: handleCallEnd,
           timingConfig: {
             isDurationVisible: true,
             onDurationUpdate: (duration: number) => {
@@ -80,27 +84,25 @@ export default function ZegoCallScreen({route}: any) {
                 );
               }
               if (duration === 10 * 60) {
-                handleCallCancelled();
+                handleCallEnd();
               }
             },
           },
           avatarBuilder: ({userInfo}: {userInfo: {userID: string}}) => (
-            <View style={{width: '100%', height: '100%'}}>
-              <Image
-                style={{width: '100%', height: '100%'}}
-                resizeMode="cover"
-                source={
-                  image
-                    ? {uri: image}
-                    : {
-                        uri: 'https://i.pinimg.com/736x/09/80/62/098062ede8791dc791c3110250d2a413.jpg',
-                      }
-                }
-              />
-            </View>
+            <Image
+              style={{width: '100%', height: '100%'}}
+              resizeMode="cover"
+              source={
+                userInfo.userID === peerId && image
+                  ? {uri: image}
+                  : {
+                      uri: 'https://i.pinimg.com/736x/09/80/62/098062ede8791dc791c3110250d2a413.jpg',
+                    }
+              }
+            />
           ),
           scenario: {
-            mode: 'VIDEO_CALL',
+            mode: callType === 'video' ? 'VIDEO_CALL' : 'VOICE_CALL',
           },
         }}
       />

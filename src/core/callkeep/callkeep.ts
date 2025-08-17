@@ -21,6 +21,7 @@ type CurrentCallData = {
 const options: IOptions = {
   ios: {appName: 'YourApp', supportsVideo: true},
   android: {
+    selfManaged: true,
     alertTitle: 'Quyền gọi',
     alertDescription: 'Ứng dụng cần quyền để hiển thị cuộc gọi.',
     cancelButton: 'Huỷ',
@@ -29,7 +30,7 @@ const options: IOptions = {
   },
 };
 
-let initialized = false;
+let initialized = (globalThis as any).__CK_INIT__ ?? false;
 let socketWired = false;
 let currentCallData: CurrentCallData | null = null;
 let suppressNextEndEvent = false;
@@ -58,6 +59,7 @@ function emitCallEnded(d: CurrentCallData, missed = false) {
     senderId: d.selfId,
     missed,
     duration: missed ? 0 : calcDurationSec(d),
+    callType: d.callType ?? 'video',
   });
 }
 
@@ -70,8 +72,14 @@ function closeCallKeepUI(uuid?: string) {
 export async function setupCallKeep() {
   if (initialized) return;
 
+
   await RNCallKeep.setup(options);
   RNCallKeep.setAvailable(true);
+
+  try {
+    RNCallKeep.removeEventListener('answerCall');
+    RNCallKeep.removeEventListener('endCall');
+  } catch {}
 
   // ====== CALLEE trả lời từ UI CallKeep ======
   RNCallKeep.addEventListener('answerCall', ({callUUID}) => {
@@ -79,6 +87,7 @@ export async function setupCallKeep() {
       currentCallData.isAnswered = true;
       currentCallData.startTime = Date.now();
 
+      // Join phòng call
       socketInstance?.emit('joinCall', {
         roomId: currentCallData.roomId,
         userId: currentCallData.selfId,
@@ -89,7 +98,7 @@ export async function setupCallKeep() {
       navigationRef.current?.navigate('ZegoCallScreen', {
         callUUID,
         isIncoming: !currentCallData.isCaller,
-        userID: currentCallData.peerId ?? '',
+        userID: currentCallData.selfId,
         userName: currentCallData.peerName ?? '',
         callID: currentCallData.roomId,
         image: 'https://link-to-avatar',
@@ -100,12 +109,14 @@ export async function setupCallKeep() {
       // Đóng UI CallKeep
       closeCallKeepUI(callUUID);
     }
+
+    initialized = true;
+    (globalThis as any).__CK_INIT__ = true;
   });
 
-  // ====== Caller hoặc Callee bấm nút End Call trên UI CallKeep ======
+  // ====== End Call ======
   RNCallKeep.addEventListener('endCall', ({callUUID}) => {
     console.log('endCall', callUUID);
-    // Không phải cuộc gọi hiện tại thì bỏ qua
     if (currentCallData?.uuid && callUUID !== currentCallData.uuid) return;
 
     if (suppressNextEndEvent) {
@@ -130,6 +141,7 @@ export function wireCallSocketHandlers() {
   socketInstance.on('incomingCall', onIncomingCallFromServer);
   socketInstance.on('userJoinedCall', onUserJoinedCall);
   socketInstance.on('userLeftCall', onUserLeftCall);
+  socketInstance.on('callEnded', onCallEndedFromServer);
   socketWired = true;
 }
 
@@ -217,6 +229,7 @@ export function teardownCallKeep() {
     socketInstance.off('incomingCall', onIncomingCallFromServer);
     socketInstance.off('userJoinedCall', onUserJoinedCall);
     socketInstance.off('userLeftCall', onUserLeftCall);
+    socketInstance.off('callEnded', onCallEndedFromServer);
     socketWired = false;
   }
 }
@@ -236,13 +249,6 @@ function onIncomingCallFromServer({
   callUuid?: string;
 }) {
   const selfId = currentCallData?.selfId ?? 'me';
-
-  // Join socket room chat và room call ngay khi nhận
-  if (socketInstance) {
-    socketInstance.emit('joinRoom', {roomId, userId: selfId});
-    socketInstance.emit('joinCall', {roomId, userId: selfId, callType: type});
-  }
-
   showIncomingCall({
     uuid: callUuid || uuidv4(),
     callerName,
@@ -263,23 +269,28 @@ function onUserJoinedCall({
   userId: string;
   callType: CallType;
 }) {
-  // Caller nhận sự kiện callee đã nhấc máy
-  if (currentCallData?.isCaller && currentCallData.roomId === roomId) {
-    closeCallKeepUI(currentCallData.uuid); // Đóng UI CallKeep ngay
+  if (currentCallData?.roomId === roomId) {
+    closeCallKeepUI(currentCallData.uuid);
     currentCallData.isAnswered = true;
     currentCallData.startTime = Date.now();
     currentCallData.callType = callType;
 
-    // Chuyển sang màn hình gọi
+    // Join phòng call
+    socketInstance?.emit('joinCall', {
+      roomId,
+      userId: currentCallData.selfId,
+      callType,
+    });
+
     navigationRef.current?.navigate('ZegoCallScreen', {
       callUUID: currentCallData.uuid,
-      isIncoming: false,
-      userID: userId,
+      isIncoming: !currentCallData.isCaller,
+      userID: currentCallData.selfId,
       userName: currentCallData.peerName ?? '',
       callID: roomId,
-      image: 'https://link-to-avatar',
+      // image: 'https://link-to-avatar',
       callType,
-      isCaller: true,
+      isCaller: currentCallData.isCaller,
     });
   }
 }
@@ -287,6 +298,15 @@ function onUserJoinedCall({
 function onUserLeftCall({roomId}: {roomId: string}) {
   if (currentCallData?.roomId === roomId) {
     closeCallKeepUI(currentCallData.uuid);
+    navigationRef.current?.goBack();
+    currentCallData = null;
+  }
+}
+
+function onCallEndedFromServer({roomId}: {roomId: string}) {
+  if (currentCallData?.roomId === roomId) {
+    closeCallKeepUI(currentCallData.uuid);
+    navigationRef.current?.goBack();
     currentCallData = null;
   }
 }

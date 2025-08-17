@@ -93,7 +93,6 @@ export const UserInfo = () => {
   const styles = UserInfoStyles(theme);
   const color = Colors[theme];
   const {showAlert} = useHeadAlert();
-  // State to manage MessageMedia fetching data
   const [media, setMedia] = useState<MediaItem[]>([]);
   const [mediaPage, setMediaPage] = useState<number>(1);
   const [isLoading, setIsLoading] = useState<boolean>(false);
