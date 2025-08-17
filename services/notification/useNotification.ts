@@ -22,17 +22,16 @@ export const useNotificationHandler = (onNavigate: (data: any) => void) => {
 
   const handleIncomingCallPush = useCallback(
     async (data: any) => {
-      // BE gửi: type, callId, callUuid, userId, userName, callType, roomId, image?
       await setupCallKeep();
       connectToSocket();
       if (user?._id) setCallKeepUserId(user._id);
 
       showIncomingCall({
-        uuid: data.callUuid, // ← dùng callUuid
+        uuid: data.callUuid,
         callerName: data.userName || 'Cuộc gọi tới',
-        handle: data.userId, // ← callerId
+        handle: data.userId,
         hasVideo: (data.callType || 'video') === 'video',
-        roomId: data.callId || data.roomId, // ← id phòng gọi
+        roomId: data.callId || data.roomId,
         callerId: data.userId,
         image: data.image,
       });
@@ -45,7 +44,7 @@ export const useNotificationHandler = (onNavigate: (data: any) => void) => {
       const t = remoteMessage?.data?.type;
       if (t === 'incoming_call') {
         await handleIncomingCallPush(remoteMessage.data);
-        return; // không show modal
+        return; 
       }
 
       setModalData({

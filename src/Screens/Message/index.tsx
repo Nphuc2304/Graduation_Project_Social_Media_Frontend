@@ -54,7 +54,7 @@ export const MessageScreen = () => {
   const [message, setMessage] = useState('');
   const [chat, setChat] = useState<Message[]>([]);
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
-  const [linkPreviews, setLinkPreviews] = useState<{[key: number]: any}>({});
+  const [linkPreviews, setLinkPreviews] = useState<{[messageId: string]: any}>({});
   const [modalVisible, setModalVisible] = useState(false);
   const [content, setContent] = useState<Message>();
   const [relationStatus, setRelationStatus] = useState<boolean>(false);
@@ -240,14 +240,15 @@ export const MessageScreen = () => {
   }, [socket]);
 
   useEffect(() => {
-    chat.forEach((item, index) => {
-      if (!linkPreviews[index] && item.content.match(/https?:\/\/\S+/)) {
+    chat.forEach(item => {
+      if (!item?.content) return;
+      if (!linkPreviews[item._id] && item.content.match(/https?:\/\/\S+/)) {
         LinkPreview.getPreview(item.content).then(data => {
-          setLinkPreviews(prev => ({...prev, [index]: data}));
+          setLinkPreviews(prev => ({...prev, [item._id]: data}));
         });
       }
     });
-  }, [chat]);
+  }, [chat, linkPreviews]);
 
   // Handle highlighting from search results
   useEffect(() => {

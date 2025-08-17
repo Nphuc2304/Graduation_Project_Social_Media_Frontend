@@ -40,6 +40,12 @@ let socketInstance: Socket | null = null;
 let callkeepUserId: string | null = null;
 
 export function setCallKeepSocket(s: Socket | null) {
+  if (socketInstance && socketWired) {
+    socketInstance.off('incomingCall', onIncomingCallFromServer);
+    socketInstance.off('callAccepted');
+    socketInstance.off('callEnded');
+    socketWired = false;
+  }
   socketInstance = s;
   if (s) wireCallSocketHandlers();
 }
@@ -255,6 +261,8 @@ export function endAllCalls() {
 export function teardownCallKeep() {
   if (socketInstance && socketWired) {
     socketInstance.off('incomingCall', onIncomingCallFromServer);
+    socketInstance.off('callAccepted');
+    socketInstance.off('callEnded');
     socketWired = false;
   }
 }
