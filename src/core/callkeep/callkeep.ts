@@ -84,54 +84,29 @@ export async function setupCallKeep() {
     RNCallKeep.removeEventListener('endCall');
   } catch {}
 
-  // ====== CALLEE trả lời từ UI CallKeep ======
   RNCallKeep.addEventListener('answerCall', ({callUUID}) => {
-    if (currentCallData) {
-      currentCallData.isAnswered = true;
-      currentCallData.startTime = Date.now();
+    if (!currentCallData) return;
 
-      socketInstance?.emit('joinRoom', {
-        roomId: currentCallData.roomId,
-        userId: currentCallData.selfId,
-      });
+    currentCallData.isAnswered = true;
+    currentCallData.startTime = Date.now();
 
-      navigationRef.current?.navigate('ZegoCallScreen', {
-        callUUID,
-        isIncoming: !currentCallData.isCaller,
-        userID: currentCallData.selfId,
-        userName: currentCallData.peerName ?? '',
-        callID: currentCallData.roomId,
-        image: 'https://link-to-avatar',
-        callType: currentCallData.callType,
-        isCaller: currentCallData.isCaller,
-      });
+    socketInstance?.emit('joinRoom', {
+      roomId: currentCallData.roomId,
+      userId: currentCallData.selfId,
+    });
 
-      closeCallKeepUI(callUUID);
-      RNCallKeep.addEventListener('answerCall', ({callUUID}) => {
-        if (!currentCallData) return;
-        currentCallData.isAnswered = true;
-        currentCallData.startTime = Date.now();
-        socketInstance?.emit('joinCall', {
-          roomId: currentCallData.roomId,
-          userId: currentCallData.selfId,
-          callType: currentCallData.callType ?? 'video',
-        });
-        navigationRef.current?.navigate('ZegoCallScreen', {
-          callUUID,
-          isIncoming: !currentCallData.isCaller,
-          userID: currentCallData.selfId,
-          userName: currentCallData.peerName ?? '',
-          callID: currentCallData.roomId,
-          image: 'https://link-to-avatar',
-          callType: currentCallData.callType,
-          isCaller: currentCallData.isCaller,
-        });
-        closeCallKeepUI(callUUID);
-      });
-    }
+    navigationRef.current?.navigate('ZegoCallScreen', {
+      callUUID,
+      isIncoming: !currentCallData.isCaller,
+      userID: currentCallData.selfId,
+      userName: currentCallData.peerName ?? '',
+      callID: currentCallData.roomId,
+      image: 'https://link-to-avatar',
+      callType: currentCallData.callType,
+      isCaller: currentCallData.isCaller,
+    });
 
-    initialized = true;
-    (globalThis as any).__CK_INIT__ = true;
+    closeCallKeepUI(callUUID);
   });
 
   // ====== End Call ======
@@ -272,55 +247,4 @@ function onIncomingCallFromServer({
     selfId,
     callerId,
   });
-}
-
-function onUserJoinedCall({
-  roomId,
-  userId,
-  callType,
-}: {
-  roomId: string;
-  userId: string;
-  callType: CallType;
-}) {
-  if (currentCallData?.roomId === roomId) {
-    closeCallKeepUI(currentCallData.uuid);
-    currentCallData.isAnswered = true;
-    currentCallData.startTime = Date.now();
-    currentCallData.callType = callType;
-
-    // Join phòng call
-    socketInstance?.emit('joinCall', {
-      roomId,
-      userId: currentCallData.selfId,
-      callType,
-    });
-
-    navigationRef.current?.navigate('ZegoCallScreen', {
-      callUUID: currentCallData.uuid,
-      isIncoming: !currentCallData.isCaller,
-      userID: currentCallData.selfId,
-      userName: currentCallData.peerName ?? '',
-      callID: roomId,
-      // image: 'https://link-to-avatar',
-      callType,
-      isCaller: currentCallData.isCaller,
-    });
-  }
-}
-
-function onUserLeftCall({roomId}: {roomId: string}) {
-  if (currentCallData?.roomId === roomId) {
-    closeCallKeepUI(currentCallData.uuid);
-    navigationRef.current?.goBack();
-    currentCallData = null;
-  }
-}
-
-function onCallEndedFromServer({roomId}: {roomId: string}) {
-  if (currentCallData?.roomId === roomId) {
-    closeCallKeepUI(currentCallData.uuid);
-    navigationRef.current?.goBack();
-    currentCallData = null;
-  }
 }
