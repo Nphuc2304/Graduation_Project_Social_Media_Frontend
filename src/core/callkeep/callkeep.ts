@@ -127,6 +127,7 @@ export async function setupCallKeep() {
 
     if (suppressNextEndEvent) {
       suppressNextEndEvent = false;
+      resetNavigateGuard();
       return;
     }
 
@@ -150,20 +151,18 @@ export function wireCallSocketHandlers() {
   socketInstance.on('incomingCall', onIncomingCallFromServer);
 
   socketInstance.on('callAccepted', ({roomId, userId, callType}) => {
-    console.log('✅ Call accepted:', roomId, userId, callType);
     if (!currentCallData || currentCallData.roomId !== roomId) return;
 
     if (!currentCallData.isAnswered) {
       currentCallData.isAnswered = true;
       currentCallData.startTime = Date.now();
       currentCallData.callType = callType;
+      safeNavigateToZego(currentCallData);
     }
-    safeNavigateToZego(currentCallData);
   });
 
   socketInstance.on('callEnded', ({roomId}) => {
     if (!currentCallData || currentCallData.roomId !== roomId) return;
-    console.log('❌ Call ended');
     if (!currentCallData) return;
     closeCallKeepUI(currentCallData.uuid);
     currentCallData = null;
