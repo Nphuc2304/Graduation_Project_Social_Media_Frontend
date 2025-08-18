@@ -33,7 +33,6 @@ export const SocketProvider = ({children}: {children: React.ReactNode}) => {
   const connectToSocket = () => {
     if (!user?._id) return;
 
-    // Nếu đã có socket và còn sống thì không connect lại
     if (socketRef.current?.connected) return;
 
     const newSocket = io(BASE_URL, {
@@ -41,9 +40,10 @@ export const SocketProvider = ({children}: {children: React.ReactNode}) => {
       query: {userId: user._id},
     });
 
+    setCallKeepSocket(newSocket);
+
     newSocket.on('connect', () => {
       console.log('✅ Socket connected!');
-      setCallKeepSocket(newSocket);
       if (user?._id) setCallKeepUserId(user._id);
       wireCallSocketHandlers();
     });
