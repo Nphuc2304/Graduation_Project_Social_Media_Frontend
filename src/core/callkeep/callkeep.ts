@@ -80,10 +80,8 @@ function safeNavigateToZego(d: CurrentCallData) {
   if (isNavigatingToCall) return;
   isNavigatingToCall = true;
 
-  // 1) Đóng UI CallKeep trước
   closeCallKeepUI(d.uuid);
 
-  // 2) Delay ngắn để native hoàn tất dismiss
   setTimeout(() => {
     navigationRef.current?.navigate('ZegoCallScreen', {
       selfId: d.selfId,
@@ -104,7 +102,7 @@ export async function setupCallKeep() {
   await RNCallKeep.setup(options);
   RNCallKeep.setAvailable(true);
 
-  RNCallKeep.addEventListener('answerCall', ({callUUID}) => {
+  RNCallKeep.addEventListener('answerCall', () => {
     if (!currentCallData) return;
     currentCallData.isAnswered = true;
     currentCallData.startTime = Date.now();
@@ -123,14 +121,14 @@ export async function setupCallKeep() {
 
     if (suppressNextEndEvent) {
       suppressNextEndEvent = false;
-      currentCallData = null;
       return;
     }
 
     if (currentCallData) {
       emitCallEnded(currentCallData, !currentCallData.isAnswered);
+      currentCallData = null;
+      resetNavigateGuard();
     }
-    currentCallData = null;
   });
 
   initialized = true;
@@ -145,9 +143,14 @@ export function wireCallSocketHandlers() {
 
   socketInstance.on('incomingCall', onIncomingCallFromServer);
 
-  socketInstance.on('callAccepted', () => {
-    if (!currentCallData) return;
+  socketInstance.on('callAccepted', ({roomId, userId, callType}) => {
+    if (!currentCallData || currentCallData.roomId !== roomId) return;
 
+    if (!currentCallData.isAnswered) {
+      currentCallData.isAnswered = true;
+      currentCallData.startTime = Date.now();
+      currentCallData.callType = callType;
+    }
     safeNavigateToZego(currentCallData);
   });
 
@@ -232,11 +235,11 @@ export function startOutgoingCall({
     isCaller: true,
     isAnswered: false,
   };
-  RNCallKeep.startCall(uuid, callee, calleeName, 'number', hasVideo);
   socketInstance?.emit('joinRoom', {
     roomId,
     userId: selfId,
   });
+  RNCallKeep.startCall(uuid, callee, calleeName, 'number', hasVideo);
   return uuid;
 }
 
@@ -248,7 +251,12 @@ export function endCall(uuid?: string) {
   if (d) emitCallEnded(d, !d.isAnswered);
   suppressNextEndEvent = true;
   RNCallKeep.endCall(id);
-  currentCallData = null;
+  setTimeout(() => {
+    if (currentCallData && currentCallData.uuid === id) {
+      currentCallData = null;
+      resetNavigateGuard();
+    }
+  }, 5000);
 }
 
 export function endAllCalls() {
@@ -272,6 +280,10 @@ function onIncomingCallFromServer({
   callUuid,
   image,
 }: any) {
+  const selfId = getSelfId();
+  if (selfId) {
+    socketInstance?.emit('joinRoom', {roomId, userId: selfId});
+  }
   showIncomingCall({
     uuid: callUuid || uuidv4(),
     callerName,
@@ -281,9 +293,4 @@ function onIncomingCallFromServer({
     callerId,
     image,
   });
-
-  const selfId = getSelfId();
-  if (selfId) {
-    socketInstance?.emit('joinRoom', {roomId, userId: selfId});
-  }
 }
