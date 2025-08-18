@@ -139,11 +139,12 @@ function resetNavigateGuard() {
 }
 
 export function wireCallSocketHandlers() {
-  if (socketWired || !socketInstance) return;
+  if (!socketInstance) return;
 
   socketInstance.on('incomingCall', onIncomingCallFromServer);
 
   socketInstance.on('callAccepted', ({roomId, userId, callType}) => {
+    console.log('✅ Call accepted:', roomId, userId, callType);
     if (!currentCallData || currentCallData.roomId !== roomId) return;
 
     if (!currentCallData.isAnswered) {
@@ -155,6 +156,7 @@ export function wireCallSocketHandlers() {
   });
 
   socketInstance.on('callEnded', () => {
+    console.log('❌ Call ended');
     if (!currentCallData) return;
     closeCallKeepUI(currentCallData.uuid);
     currentCallData = null;
