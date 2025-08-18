@@ -117,7 +117,13 @@ export async function setupCallKeep() {
   });
 
   RNCallKeep.addEventListener('endCall', ({callUUID}) => {
-    if (currentCallData?.uuid && callUUID !== currentCallData.uuid) return;
+    if (
+      callUUID &&
+      currentCallData?.uuid &&
+      callUUID !== currentCallData.uuid
+    ) {
+      return;
+    }
 
     if (suppressNextEndEvent) {
       suppressNextEndEvent = false;
@@ -155,7 +161,8 @@ export function wireCallSocketHandlers() {
     safeNavigateToZego(currentCallData);
   });
 
-  socketInstance.on('callEnded', () => {
+  socketInstance.on('callEnded', ({roomId}) => {
+    if (!currentCallData || currentCallData.roomId !== roomId) return;
     console.log('❌ Call ended');
     if (!currentCallData) return;
     closeCallKeepUI(currentCallData.uuid);
