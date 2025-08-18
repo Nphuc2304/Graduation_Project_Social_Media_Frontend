@@ -139,6 +139,7 @@ export async function setupCallKeep() {
   });
 
   initialized = true;
+  (globalThis as any).__CK_INIT__ = true;
 }
 
 function resetNavigateGuard() {
@@ -194,6 +195,11 @@ export function showIncomingCall({
   callerId: string;
   image?: string;
 }) {
+  const selfId = getSelfId();
+  if (selfId) {
+    socketInstance?.emit('joinRoom', {roomId, userId: selfId});
+  }
+
   currentCallData = {
     uuid,
     roomId,
