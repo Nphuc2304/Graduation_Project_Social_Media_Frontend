@@ -59,7 +59,6 @@ function calcDurationSec(d: CurrentCallData) {
 }
 
 function emitCallEnded(d: CurrentCallData, missed = false) {
-  if (!d.roomId || !d.selfId) return;
   socketInstance?.emit('callEnded', {
     roomId: d.roomId,
     senderId: d.selfId,
@@ -110,19 +109,12 @@ export async function setupCallKeep() {
     currentCallData.isAnswered = true;
     currentCallData.startTime = Date.now();
 
-    console.log('[acceptCall payload]', {
-      roomId: currentCallData.roomId,
-      userId: currentCallData.selfId,
-      callType: currentCallData.callType,
-    });
-
     socketInstance?.emit('acceptCall', {
       roomId: currentCallData.roomId,
       userId: currentCallData.selfId,
       callType: currentCallData.callType,
     });
 
-    // Đổi: dùng safeNavigateToZego (đã đóng UI + delay)
     safeNavigateToZego(currentCallData);
   });
 
@@ -153,20 +145,14 @@ export function wireCallSocketHandlers() {
 
   socketInstance.on('incomingCall', onIncomingCallFromServer);
 
-  socketInstance.on('callAccepted', ({roomId, userId, callType}) => {
-    if (!currentCallData || currentCallData.roomId !== roomId) return;
-    if (currentCallData.isAnswered) return; // đã điều hướng rồi
+  socketInstance.on('callAccepted', () => {
+    if (!currentCallData) return;
 
-    currentCallData.isAnswered = true;
-    currentCallData.startTime = Date.now();
-    currentCallData.callType = callType;
-
-    // Caller điều hướng an toàn
     safeNavigateToZego(currentCallData);
   });
 
-  socketInstance.on('callEnded', ({roomId}) => {
-    if (!currentCallData || currentCallData.roomId !== roomId) return;
+  socketInstance.on('callEnded', () => {
+    if (!currentCallData) return;
     closeCallKeepUI(currentCallData.uuid);
     currentCallData = null;
     resetNavigateGuard();
