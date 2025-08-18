@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   View,
   Text,
@@ -50,7 +50,7 @@ const HighlightEditModal = ({
   const [highlightName, setHighlightName] = useState('');
   const [coverImage, setCoverImage] = useState<string | null>(null);
   const [isCustomCover, setIsCustomCover] = useState(false);
-
+  const [length, setLength] = useState(0);
   const {theme} = useTheme();
   const color = Colors[theme];
 
@@ -60,6 +60,9 @@ const HighlightEditModal = ({
       setCoverImage(selectedStories[0].mediaUrl);
     }
   }, [selectedStories, isCustomCover]);
+  useEffect(() => {
+    setLength(highlightName.length);
+  }, [highlightName]);
 
   const pickImage = () => {
     const options = {
@@ -129,6 +132,7 @@ const HighlightEditModal = ({
     }
   };
 
+
   return (
     <Modal
       animationType="slide"
@@ -163,13 +167,18 @@ const HighlightEditModal = ({
                 <Text style={styles.editCover}>Chỉnh sửa ảnh bìa</Text>
               </TouchableOpacity>
             </View>
+            <View style={[{flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, styles.input]}>
+
             <TextInput
-              style={[styles.input, {color: color.text}]}
+             style={{flex: 1}}
               placeholder="Nhập tên highlight"
               placeholderTextColor={'gray'}
               value={highlightName}
               onChangeText={setHighlightName}
+              maxLength={10}
             />
+            <Text style={{color: color.text, fontSize: 12, }}>{length}/10</Text>
+            </View>
             <FlatList
               data={selectedStories}
               renderItem={({item}) => (

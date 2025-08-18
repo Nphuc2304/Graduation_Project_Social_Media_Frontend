@@ -1385,6 +1385,8 @@ export const SeenStory = ({route, navigation}: any) => {
               }
             }}
             onDelete={handleDeleteStory}
+            storyId={selectedItem?._id}
+            storyThumbnail={selectedItem?.mediaUrl}
           />
         </Portal>
       )}
