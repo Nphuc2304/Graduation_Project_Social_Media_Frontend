@@ -44,7 +44,7 @@ export const useNotificationHandler = (onNavigate: (data: any) => void) => {
       const t = remoteMessage?.data?.type;
       if (t === 'incoming_call') {
         await handleIncomingCallPush(remoteMessage.data);
-        return; 
+        return;
       }
 
       setModalData({
