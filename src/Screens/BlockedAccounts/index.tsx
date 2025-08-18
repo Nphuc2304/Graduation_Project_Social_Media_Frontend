@@ -57,12 +57,6 @@ export const BlockedAccounts = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {loading && (
-        <View style={styles.loaderOverlay}>
-          <LoadingModal />
-        </View>
-      )}
-
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <ArrowLeft size={22} color={color.text} />
@@ -74,7 +68,9 @@ export const BlockedAccounts = () => {
       </View>
 
       <View style={[styles.container, {marginHorizontal: 24}]}>
-        {!loading && blocking.length === 0 ? (
+        {loading ? (
+          <LoadingModal inline />
+        ) : blocking.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>Bạn hiện không chặn ai.</Text>
           </View>
