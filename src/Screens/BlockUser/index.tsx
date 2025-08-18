@@ -12,6 +12,8 @@ import {useDispatch, useSelector} from 'react-redux';
 import {AppDispatch, RootState} from '../../../services/store';
 import {
   fetchFollowing,
+  fetchFollowers,
+  fetchBlocking,
   relationAction,
 } from '../../../services/relationRedux/relationSlice';
 import ItemList from './Components/itemList';
@@ -33,44 +35,127 @@ export const BlockUser = () => {
   const dispatch = useDispatch<AppDispatch>();
   const userId = useSelector((state: RootState) => state.user.user?._id);
 
-  const {following, loading, error} = useSelector(
+  const {following, followers, blocking, loading, error} = useSelector(
     (state: RootState) => state.relation,
   );
-  const [listUser, setListUser] = useState(following);
+  
+  const [listUser, setListUser] = useState<UserProfile[]>([]);
   const [searchText, setSearchText] = useState('');
   const [userBlock, setUserBlock] = useState<UserProfile | null>(null);
   const modalRef = React.useRef<Modalize>(null);
 
-  // fetch on focus
+  // Fetch data on focus
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
-      if (userId) dispatch(fetchFollowing({userId}));
+      if (userId) {
+        dispatch(fetchFollowing({userId}));
+        dispatch(fetchFollowers({userId}));
+        dispatch(fetchBlocking({userId}));
+      }
     });
     return unsubscribe;
   }, [navigation, userId]);
 
-  // sync local list when following changes
+  // Merge and filter users whenever following, followers, or blocking changes
   useEffect(() => {
-    setListUser(following);
-  }, [following]);
+    const mergeAndFilterUsers = () => {
+      // Create a Set of blocked user IDs for quick lookup
+      const blockedUserIds = new Set(blocking.map(user => user._id));
+      
+      // Create a Map to store unique users (using _id as key to avoid duplicates)
+      const uniqueUsersMap = new Map<string, UserProfile>();
+      
+      // Add followers to the map
+      followers.forEach(user => {
+        if (!blockedUserIds.has(user._id)) {
+          uniqueUsersMap.set(user._id, user);
+        }
+      });
+      
+      // Add following to the map (this will automatically handle duplicates)
+      following.forEach(user => {
+        if (!blockedUserIds.has(user._id)) {
+          uniqueUsersMap.set(user._id, user);
+        }
+      });
+      
+      // Convert map values back to array
+      const mergedUsers = Array.from(uniqueUsersMap.values());
+      
+      // Sort by handleName for consistent ordering
+      mergedUsers.sort((a, b) => 
+        a.handleName.toLowerCase().localeCompare(b.handleName.toLowerCase())
+      );
+      
+      setListUser(mergedUsers);
+    };
+
+    mergeAndFilterUsers();
+  }, [following, followers, blocking]);
 
   useEffect(() => {
     if (error) GlobalAlertManager.show('Lỗi', error);
   }, [error]);
 
-  // search filter
+  // Search filter
   useEffect(() => {
     if (searchText.trim().length > 0) {
-      const filtered = following.filter(
+      // Create merged list first (same logic as above but inline for search)
+      const blockedUserIds = new Set(blocking.map(user => user._id));
+      const uniqueUsersMap = new Map<string, UserProfile>();
+      
+      followers.forEach(user => {
+        if (!blockedUserIds.has(user._id)) {
+          uniqueUsersMap.set(user._id, user);
+        }
+      });
+      
+      following.forEach(user => {
+        if (!blockedUserIds.has(user._id)) {
+          uniqueUsersMap.set(user._id, user);
+        }
+      });
+      
+      const mergedUsers = Array.from(uniqueUsersMap.values());
+      
+      // Apply search filter
+      const filtered = mergedUsers.filter(
         u =>
           u.handleName.toLowerCase().includes(searchText.toLowerCase()) ||
           u.username.toLowerCase().includes(searchText.toLowerCase()),
       );
+      
+      // Sort filtered results
+      filtered.sort((a, b) => 
+        a.handleName.toLowerCase().localeCompare(b.handleName.toLowerCase())
+      );
+      
       setListUser(filtered);
     } else {
-      setListUser(following);
+      // If no search text, use the merged list from the previous useEffect
+      const blockedUserIds = new Set(blocking.map(user => user._id));
+      const uniqueUsersMap = new Map<string, UserProfile>();
+      
+      followers.forEach(user => {
+        if (!blockedUserIds.has(user._id)) {
+          uniqueUsersMap.set(user._id, user);
+        }
+      });
+      
+      following.forEach(user => {
+        if (!blockedUserIds.has(user._id)) {
+          uniqueUsersMap.set(user._id, user);
+        }
+      });
+      
+      const mergedUsers = Array.from(uniqueUsersMap.values());
+      mergedUsers.sort((a, b) => 
+        a.handleName.toLowerCase().localeCompare(b.handleName.toLowerCase())
+      );
+      
+      setListUser(mergedUsers);
     }
-  }, [searchText, following]);
+  }, [searchText, following, followers, blocking]);
 
   const onOpen = () => modalRef.current?.open();
 
@@ -81,7 +166,12 @@ export const BlockUser = () => {
         relationAction({targetId: userBlock._id, action: 'block'}),
       ).unwrap();
       modalRef.current?.close();
-      if (userId) dispatch(fetchFollowing({userId}));
+      if (userId) {
+        // Refresh all lists after blocking
+        dispatch(fetchFollowing({userId}));
+        dispatch(fetchFollowers({userId}));
+        dispatch(fetchBlocking({userId}));
+      }
     } catch (e: any) {
       GlobalAlertManager.show('Lỗi', e || 'Chặn thất bại');
     }
@@ -89,11 +179,6 @@ export const BlockUser = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {loading && (
-        <View style={styles.loaderOverlay}>
-          <LoadingModal />
-        </View>
-      )}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <ArrowLeft size={22} color={colors.text} />
@@ -117,10 +202,15 @@ export const BlockUser = () => {
         )}
       </View>
       <View style={[styles.container, {paddingHorizontal: 20}]}>
-        {!loading && listUser.length === 0 ? (
+        {loading ? (
+          <LoadingModal inline />
+        ) : listUser.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>
-              Không có người dùng được đề xuất để chặn.
+              {searchText.trim() 
+                ? 'Không tìm thấy người dùng nào.'
+                : 'Không có người dùng để chặn.'
+              }
             </Text>
           </View>
         ) : (

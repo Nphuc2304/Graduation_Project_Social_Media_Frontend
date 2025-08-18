@@ -12,7 +12,8 @@ import {
 import React, {useEffect, useRef, useState} from 'react';
 import CameraRoll, {
   PhotoIdentifier,
-  PhotoIdentifiersPage
+  PhotoIdentifiersPage,
+  AssetType
 } from '@react-native-community/cameraroll';
 import {useFocusEffect, useNavigation, useRoute} from '@react-navigation/native';
 import {FlashList} from '@shopify/flash-list';
@@ -38,19 +39,23 @@ export const AddPost = () => {
   const color = Colors[theme];
   const {width} = Dimensions.get('window');
   const navigation = useNavigation<any>();
-  const [medias, setMedias] = useState<PhotoIdentifier[]>([]);
+  const [allMedias, setAllMedias] = useState<PhotoIdentifier[]>([]); 
+  const [displayedMedias, setDisplayedMedias] = useState<PhotoIdentifier[]>([]);
   const [pageInfo, setPageInfo] = useState<
     PhotoIdentifiersPage['page_info'] | null
   >(null);
-  const [selectedMedia, setSelectedMedia] = useState<PhotoIdentifier | null>(
-    null,
-  );
+  const [selectedMedia, setSelectedMedia] = useState<PhotoIdentifier | null>(null);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
 
   const route = useRoute();
   const {type}: any = route.params || {};
   const popupFilterRef = useRef<CustomPopupModalRef>(null);
   const [selectedItems, setSelectedItems] = useState<PhotoIdentifier[]>([]);
   const [isMultiSelect, setIsMultiSelect] = useState(false);
+
+  const DISPLAY_BATCH_SIZE = 60;
+  const LOAD_MORE_BATCH_SIZE = 60;
 
   //phân loại ảnh và video
   const [filter, setFilter] = useState(() => {
@@ -99,50 +104,127 @@ export const AddPost = () => {
     return true;
   }
 
-  // lấy ảnh từ máy
-  const fetchMedia = async () => {
-    try {
-      const result = await CameraRoll.getPhotos({
-        first: 50,
-        assetType:
-          filter === 'Tất cả'
-            ? 'All'
-            : filter === 'Thước phim'
-            ? 'Videos'
-            : 'Photos',
-      });
-
-      setMedias(result.edges);
-      setPageInfo(result.page_info);
-    } catch (error) {
-      console.error('err: ', error);
+  // Helper function to get asset type
+  const getAssetType = (filterType: string): AssetType => {
+    switch (filterType) {
+      case 'Thước phim':
+        return 'Videos';
+      case 'Hình ảnh':
+        return 'Photos';
+      default:
+        return 'All';
     }
   };
 
+  const fetchAllMedia = async () => {
+    try {
+      console.log('Fetching all media with filter:', filter);
+      setIsInitialLoading(true);
+      
+      const result = await CameraRoll.getPhotos({
+        first: 1000,
+        assetType: getAssetType(filter),
+        groupTypes: 'All',
+        include: ['filename', 'fileSize', 'location', 'imageSize', 'playableDuration'],
+      });
+
+      console.log('Total media fetched:', result.edges.length);
+      
+      // Store all media
+      let allMedia = result.edges;
+      setAllMedias(allMedia);
+      setPageInfo(result.page_info);
+      
+      // Show only first batch initially for fast UI
+      const initialBatch = allMedia.slice(0, DISPLAY_BATCH_SIZE);
+      setDisplayedMedias(initialBatch);
+      
+      // Auto-select first item
+      if (initialBatch.length > 0) {
+        setSelectedMedia(initialBatch[0]);
+      }
+      
+      // If there are still more pages, fetch them in background
+      if (result.page_info.has_next_page && result.page_info.end_cursor) {
+        // Continue fetching remaining in background without blocking UI
+        fetchRemainingMediaInBackground(result.page_info.end_cursor, allMedia);
+      }
+      
+    } catch (error) {
+      console.error('Error fetching media: ', error);
+    } finally {
+      setIsInitialLoading(false);
+    }
+  };
+
+  // Fetch remaining media in background without blocking UI
+  const fetchRemainingMediaInBackground = async (cursor: string, currentMedia: PhotoIdentifier[]) => {
+    try {
+      const result = await CameraRoll.getPhotos({
+        first: 1000,
+        assetType: getAssetType(filter),
+        after: cursor,
+        groupTypes: 'All',
+        include: ['filename', 'fileSize', 'location', 'imageSize', 'playableDuration'],
+      });
+
+      const allMedia = [...currentMedia, ...result.edges];
+      setAllMedias(allMedia);
+      setPageInfo(result.page_info);
+      
+      console.log('Background fetch completed. Total media:', allMedia.length);
+
+      // Continue if there's more
+      if (result.page_info.has_next_page && result.page_info.end_cursor) {
+        // Small delay to prevent blocking
+        setTimeout(() => {
+          fetchRemainingMediaInBackground(result.page_info.end_cursor!, allMedia);
+        }, 100);
+      }
+    } catch (error) {
+      console.error('Error fetching remaining media in background:', error);
+    }
+  };
+
+  const loadMoreDisplayedMedia = () => {
+    if (isLoadingMore) return;
+    
+    setIsLoadingMore(true);
+    
+    setTimeout(() => {
+      const currentDisplayedCount = displayedMedias.length;
+      const nextBatch = allMedias.slice(
+        currentDisplayedCount, 
+        currentDisplayedCount + LOAD_MORE_BATCH_SIZE
+      );
+      
+      if (nextBatch.length > 0) {
+        setDisplayedMedias(prev => [...prev, ...nextBatch]);
+        console.log(`Displayed ${currentDisplayedCount + nextBatch.length}/${allMedias.length} media`);
+      }
+      
+      setIsLoadingMore(false);
+    }, 100); // Small delay for smooth UX
+  };
+
+  // Reset data when filter changes
   useEffect(() => {
     (async () => {
       const hasPermission = await requestPermission();
       if (hasPermission) {
-        fetchMedia();
+        // Reset selection when filter changes
+        setSelectedMedia(null);
+        setSelectedItems([]);
+        setAllMedias([]);
+        setDisplayedMedias([]);
+        setPageInfo(null);
+        await fetchAllMedia();
       } else {
         console.error('Permission denied to access media');
+        setIsInitialLoading(false);
       }
     })();
   }, [filter]);
-
-  // load thêm ảnh
-  const fetchMoreMedia = async () => {
-    if (!pageInfo?.has_next_page) return;
-
-    const result = await CameraRoll.getPhotos({
-      first: 50,
-      assetType: 'All',
-      after: pageInfo.end_cursor, // lấy trang tiếp theo dựa vào end_cursor
-    });
-
-    setMedias(prev => [...prev, ...result.edges]);
-    setPageInfo(result.page_info);
-  };
 
   const handleSelect = (item: any) => {
     const isVideo = item.node.type.startsWith('video');
@@ -162,7 +244,6 @@ export const AddPost = () => {
         return;
       }
 
-      //nếu cchỉ vd
       const isSelected =
         selectedItems[0]?.node.image.uri === item.node.image.uri;
       if (selectedItems.length === 1 && isSelected) {
@@ -208,9 +289,8 @@ export const AddPost = () => {
           setSelectedItems([]);
           setSelectedMedia(null);
         } else {
-          // Single mode: chỉ chọn duy nhất 1 item
           setSelectedItems([item]);
-          setSelectedMedia(item); // luôn cập nhật ảnh lớn
+          setSelectedMedia(item);
         }
       }
     }
@@ -231,12 +311,10 @@ export const AddPost = () => {
     setIsMultiSelect(prev => {
       const next = !prev;
       if (next) {
-        // Từ single → multi
         if (selectedMedia) {
           setSelectedItems([selectedMedia]);
         }
       } else {
-        // Từ multi → single
         if (selectedItems.length > 0) {
           const lastSelected = selectedItems[selectedItems.length - 1];
           setSelectedMedia(lastSelected);
@@ -246,6 +324,30 @@ export const AddPost = () => {
       return next;
     });
   };
+
+  // Show loading state during initial load
+  if (isInitialLoading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.container}>
+          <View style={styles.rowSpace}>
+            <TouchableOpacity onPress={() => navigation.navigate('BottomTabs')}>
+              <X size={22} color={color.text} />
+            </TouchableOpacity>
+            <Text style={styles.title}>Bài đăng mới</Text>
+            <TouchableOpacity onPress={handleNext}>
+              <Text style={[styles.textR, {color: color.primary}]}>
+                Tiếp theo
+              </Text>
+            </TouchableOpacity>
+          </View>
+          <View style={[styles.container, {justifyContent: 'center', alignItems: 'center'}]}>
+            <Text style={styles.placeholderText}>Đang tải phương tiện...</Text>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -295,16 +397,17 @@ export const AddPost = () => {
               <GalleryHorizontal size={22} color={color.text} />
             </TouchableOpacity>
           </View>
-          {medias.length === 0 ? (
+          
+          {displayedMedias.length === 0 ? (
             <View style={styles.emtyContainer}>
               <ImageOff size={60} color={color.gray} />
               <Text style={[styles.notFound]}>Không tìm thấy 🙂‍↔️!</Text>
             </View>
           ) : (
             <FlashList
-              data={medias}
+              data={displayedMedias}
               numColumns={3}
-              keyExtractor={(item, index) => index.toString()}
+              keyExtractor={(item, index) => `${item.node.image.uri}-${index}`}
               extraData={[selectedItems, filter]}
               renderItem={({item}) => {
                 const isSelected = selectedItems.some(
@@ -385,8 +488,8 @@ export const AddPost = () => {
                 );
               }}
               estimatedItemSize={width / 3}
-              onEndReached={fetchMoreMedia}
-              onEndReachedThreshold={0.5}
+              onEndReached={loadMoreDisplayedMedia}
+              onEndReachedThreshold={0.3}
             />
           )}
         </View>
