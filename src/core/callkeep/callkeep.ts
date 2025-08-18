@@ -110,10 +110,12 @@ export async function setupCallKeep() {
     currentCallData.isAnswered = true;
     currentCallData.startTime = Date.now();
 
-    socketInstance?.emit('joinRoom', {
+    console.log('[acceptCall payload]', {
       roomId: currentCallData.roomId,
       userId: currentCallData.selfId,
+      callType: currentCallData.callType,
     });
+
     socketInstance?.emit('acceptCall', {
       roomId: currentCallData.roomId,
       userId: currentCallData.selfId,
@@ -142,6 +144,10 @@ export async function setupCallKeep() {
   initialized = true;
 }
 
+function resetNavigateGuard() {
+  isNavigatingToCall = false;
+}
+
 export function wireCallSocketHandlers() {
   if (socketWired || !socketInstance) return;
 
@@ -163,6 +169,7 @@ export function wireCallSocketHandlers() {
     if (!currentCallData || currentCallData.roomId !== roomId) return;
     closeCallKeepUI(currentCallData.uuid);
     currentCallData = null;
+    resetNavigateGuard();
   });
 
   socketWired = true;
@@ -240,6 +247,10 @@ export function startOutgoingCall({
     isAnswered: false,
   };
   RNCallKeep.startCall(uuid, callee, calleeName, 'number', hasVideo);
+  socketInstance?.emit('joinRoom', {
+    roomId,
+    userId: selfId,
+  });
   return uuid;
 }
 
@@ -284,4 +295,9 @@ function onIncomingCallFromServer({
     callerId,
     image,
   });
+
+  const selfId = getSelfId();
+  if (selfId) {
+    socketInstance?.emit('joinRoom', {roomId, userId: selfId});
+  }
 }
