@@ -6,7 +6,6 @@ import {RootState} from '../services/store';
 import {
   setCallKeepSocket,
   setCallKeepUserId,
-  wireCallSocketHandlers,
 } from '../src/core/callkeep/callkeep';
 
 interface SocketContextType {
@@ -25,6 +24,22 @@ const SocketContext = createContext<SocketContextType>({
   leaveRoom: () => {},
 });
 
+// ===== Singleton + lock để tránh tạo nhiều socket khi App & hook cùng gọi =====
+declare global {
+  // eslint-disable-next-line no-var
+  var __GLOBAL_SOCKET__: Socket | null | undefined;
+  var __SOCKET_CONNECTING__: boolean | undefined;
+}
+const getGlobalSocket = (): Socket | null =>
+  ((globalThis as any).__GLOBAL_SOCKET__ ?? null) as Socket | null;
+const setGlobalSocket = (s: Socket | null) => {
+  (globalThis as any).__GLOBAL_SOCKET__ = s;
+};
+const isConnecting = () => Boolean((globalThis as any).__SOCKET_CONNECTING__);
+const setConnecting = (v: boolean) => {
+  (globalThis as any).__SOCKET_CONNECTING__ = v;
+};
+
 export const SocketProvider = ({children}: {children: React.ReactNode}) => {
   const socketRef = useRef<Socket | null>(null);
   const [socket, setSocket] = useState<Socket | null>(null);
@@ -33,52 +48,81 @@ export const SocketProvider = ({children}: {children: React.ReactNode}) => {
   const connectToSocket = () => {
     if (!user?._id) return;
 
-    if (socketRef.current?.connected) return;
+    // Dùng lại socket đã có hoặc đang trong quá trình kết nối
+    const existing = getGlobalSocket();
+    if (existing?.connected) {
+      socketRef.current = existing;
+      setSocket(existing);
+      setCallKeepSocket(existing); // đảm bảo CallKeep dùng đúng instance
+      setCallKeepUserId(user._id);
+      return;
+    }
+    if (isConnecting()) {
+      // đã có nơi khác gọi connect rồi -> không tạo thêm
+      return;
+    }
 
-    const newSocket = io(BASE_URL, {
+    setConnecting(true);
+    const s = io(BASE_URL, {
       transports: ['websocket'],
-      query: {userId: user._id},
+      auth: {userId: user._id}, // BE đọc handshake.auth.userId
+      query: {userId: user._id}, // và cả handshake.query.userId
+      // path: '/socket.io',              // nếu BE dùng path custom thì bật
     });
 
-    setCallKeepSocket(newSocket);
+    // Gắn vào CallKeep NGAY để wire listener sớm (không đợi 'connect')
+    setCallKeepSocket(s);
 
-    newSocket.on('connect', () => {
-      console.log('✅ Socket connected!');
-      if (user?._id) setCallKeepUserId(user._id);
+    s.on('connect', () => {
+      console.log('✅ Socket connected!', s.id);
+      setCallKeepUserId(user._id);
+      setConnecting(false);
     });
 
-    newSocket.on('disconnect', () => {
-      console.log('❌ Socket disconnected!');
+    s.on('disconnect', reason => {
+      console.log('❌ Socket disconnected!', reason);
     });
 
-    newSocket.on('connect_error', err => {
-      console.log('❌ Socket error:', err.message);
+    s.on('connect_error', err => {
+      console.log('❌ Socket error:', err?.message);
+      setConnecting(false);
     });
 
-    socketRef.current = newSocket;
-    setSocket(newSocket);
+    // (tuỳ chọn) debug tất cả event về client:
+    // s.onAny((ev, ...args) => console.log('[SOCKET <-]', ev, args?.[0]));
+
+    socketRef.current = s;
+    setSocket(s);
+    setGlobalSocket(s);
   };
 
   const disconnectSocket = () => {
-    if (socketRef.current) {
-      socketRef.current.disconnect();
-      socketRef.current = null;
-      setSocket(null);
-      console.log('🔌 Socket manually disconnected.');
-      setCallKeepSocket(null);
-    }
+    const s = socketRef.current ?? getGlobalSocket();
+    if (!s) return;
+
+    s.removeAllListeners(); // dọn listener để tránh rò rỉ
+    s.disconnect();
+
+    if (socketRef.current === s) socketRef.current = null;
+    if (getGlobalSocket() === s) setGlobalSocket(null);
+    setSocket(null);
+    setCallKeepSocket(null);
+    setConnecting(false);
+    console.log('🔌 Socket manually disconnected.');
   };
 
   const joinRoom = (roomId: string) => {
-    if (socketRef.current && socketRef.current.connected) {
-      socketRef.current.emit('joinRoom', {roomId, userId: user?._id});
+    const s = socketRef.current ?? getGlobalSocket();
+    if (s?.connected && roomId) {
+      s.emit('joinRoom', {roomId, userId: user?._id});
       console.log('➡️ joinRoom:', roomId);
     }
   };
 
   const leaveRoom = (roomId: string) => {
-    if (socketRef.current && socketRef.current.connected) {
-      socketRef.current.emit('leaveRoom', roomId);
+    const s = socketRef.current ?? getGlobalSocket();
+    if (s?.connected && roomId) {
+      s.emit('leaveRoom', roomId);
       console.log('⬅️ leaveRoom:', roomId);
     }
   };

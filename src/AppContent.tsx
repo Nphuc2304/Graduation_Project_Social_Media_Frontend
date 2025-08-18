@@ -44,7 +44,7 @@ async function requestCallPermissions() {
 
 const AppContent = () => {
   const user = useSelector((state: RootState) => state.user.user);
-  const {connectToSocket, joinRoom, socket} = useSocket();
+  const {connectToSocket} = useSocket();
   useEffect(() => {
     createNotificationChannel();
   }, []);
@@ -80,31 +80,16 @@ const AppContent = () => {
         break;
       case 'incoming_call':
       case 'call': {
-        connectToSocket();
         if (user?._id) setCallKeepUserId(user._id);
-
-        const rid = modalData.data.callId || modalData.data.roomId; // roomId của cuộc gọi
         showIncomingCall({
           uuid: modalData.data.callUuid,
           callerName: modalData.data.userName || 'Cuộc gọi tới',
           handle: modalData.data.userId,
           hasVideo: (modalData.data.callType || 'video') === 'video',
-          roomId: rid,
+          roomId: modalData.data.callId || modalData.data.roomId,
           callerId: modalData.data.userId,
           image: modalData.data.image,
         });
-
-        // >>> JOIN ROOM <<<
-        if (socket?.connected) {
-          joinRoom(rid);
-        } else {
-          // đợi socket connect xong thì join (1 lần)
-          const onConnect = () => {
-            joinRoom(rid);
-            socket?.off('connect', onConnect);
-          };
-          socket?.on('connect', onConnect);
-        }
         break;
       }
       case 'message':
