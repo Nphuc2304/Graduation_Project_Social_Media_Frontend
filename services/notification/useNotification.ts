@@ -17,7 +17,7 @@ import {useSocket} from '@services/SocketContext';
 export const useNotificationHandler = (onNavigate: (data: any) => void) => {
   const [modalData, setModalData] = useState<any | null>(null);
   const dispatch = useDispatch<AppDispatch>();
-  const {connectToSocket} = useSocket();
+  const {connectToSocket, joinRoom} = useSocket();
   const user = useSelector((s: RootState) => s.user.user);
 
   const handleIncomingCallPush = useCallback(
@@ -25,6 +25,7 @@ export const useNotificationHandler = (onNavigate: (data: any) => void) => {
       await setupCallKeep();
 
       connectToSocket();
+      joinRoom(data.roomId);
 
       if (user?._id) setCallKeepUserId(user._id);
 

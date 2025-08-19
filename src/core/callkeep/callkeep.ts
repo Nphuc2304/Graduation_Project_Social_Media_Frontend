@@ -1,7 +1,7 @@
 import RNCallKeep, {IOptions} from 'react-native-callkeep';
 import 'react-native-get-random-values';
 import {v4 as uuidv4} from 'uuid';
-import {navigationRef} from '../../../src/NavigationService';
+import {navigationRef} from '../../NavigationService';
 import {Socket} from 'socket.io-client';
 
 type CallType = 'video' | 'voice';
@@ -80,8 +80,6 @@ function safeNavigateToZego(d: CurrentCallData) {
   if (isNavigatingToCall) return;
   isNavigatingToCall = true;
 
-  closeCallKeepUI(d.uuid);
-
   setTimeout(() => {
     navigationRef.current?.navigate('ZegoCallScreen', {
       selfId: d.selfId,
@@ -104,6 +102,7 @@ export async function setupCallKeep() {
 
   RNCallKeep.addEventListener('answerCall', () => {
     if (!currentCallData) return;
+    if (currentCallData.isAnswered) return;
     currentCallData.isAnswered = true;
     currentCallData.startTime = Date.now();
 
@@ -133,7 +132,7 @@ export async function setupCallKeep() {
 
     if (currentCallData) {
       emitCallEnded(currentCallData, !currentCallData.isAnswered);
-      currentCallData = null;
+      // currentCallData = null;
       resetNavigateGuard();
     }
   });
@@ -164,7 +163,7 @@ export function wireCallSocketHandlers() {
     if (!currentCallData || currentCallData.roomId !== roomId) return;
     if (!currentCallData) return;
     closeCallKeepUI(currentCallData.uuid);
-    currentCallData = null;
+    // currentCallData = null;
     resetNavigateGuard();
   });
 
@@ -261,7 +260,7 @@ export function endCall(uuid?: string) {
   RNCallKeep.endCall(id);
   setTimeout(() => {
     if (currentCallData && currentCallData.uuid === id) {
-      currentCallData = null;
+      // currentCallData = null;
       resetNavigateGuard();
     }
   }, 5000);
