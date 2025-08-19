@@ -48,12 +48,11 @@ export const SocketProvider = ({children}: {children: React.ReactNode}) => {
   const connectToSocket = () => {
     if (!user?._id) return;
 
-    // Dùng lại socket đã có hoặc đang trong quá trình kết nối
     const existing = getGlobalSocket();
     if (existing?.connected) {
       socketRef.current = existing;
       setSocket(existing);
-      setCallKeepSocket(existing); // đảm bảo CallKeep dùng đúng instance
+      setCallKeepSocket(existing);
       setCallKeepUserId(user._id);
       return;
     }
@@ -70,7 +69,6 @@ export const SocketProvider = ({children}: {children: React.ReactNode}) => {
       // path: '/socket.io',              // nếu BE dùng path custom thì bật
     });
 
-    // Gắn vào CallKeep NGAY để wire listener sớm (không đợi 'connect')
     setCallKeepSocket(s);
 
     s.on('connect', () => {
@@ -87,9 +85,6 @@ export const SocketProvider = ({children}: {children: React.ReactNode}) => {
       console.log('❌ Socket error:', err?.message);
       setConnecting(false);
     });
-
-    // (tuỳ chọn) debug tất cả event về client:
-    // s.onAny((ev, ...args) => console.log('[SOCKET <-]', ev, args?.[0]));
 
     socketRef.current = s;
     setSocket(s);

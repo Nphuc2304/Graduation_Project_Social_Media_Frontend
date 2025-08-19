@@ -24,9 +24,7 @@ export const useNotificationHandler = (onNavigate: (data: any) => void) => {
     async (data: any) => {
       await setupCallKeep();
 
-      connectToSocket();
       joinRoom(data.roomId);
-
       if (user?._id) setCallKeepUserId(user._id);
 
       showIncomingCall({

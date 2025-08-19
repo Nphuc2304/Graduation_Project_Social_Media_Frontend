@@ -39,13 +39,34 @@ let suppressNextEndEvent = false;
 let socketInstance: Socket | null = null;
 let callkeepUserId: string | null = null;
 
+function onCallAccepted({roomId, userId, callType}: any) {
+  if (!currentCallData || currentCallData.roomId !== roomId) return;
+
+  if (!currentCallData.isAnswered) {
+    currentCallData.isAnswered = true;
+    currentCallData.startTime = Date.now();
+    currentCallData.callType = callType;
+    safeNavigateToZego(currentCallData);
+
+    closeCallKeepUI(currentCallData.uuid);
+  }
+}
+
+function onCallEnded({roomId}: any) {
+  if (!currentCallData || currentCallData.roomId !== roomId) return;
+  closeCallKeepUI(currentCallData.uuid);
+  resetNavigateGuard();
+}
+
 export function setCallKeepSocket(s: Socket | null) {
+  if (socketInstance === s && socketWired) return;
+
   if (socketInstance && socketWired) {
-    // socketInstance.off('incomingCall', onIncomingCallFromServer);
-    socketInstance.off('callAccepted');
-    socketInstance.off('callEnded');
+    socketInstance.off('callAccepted', onCallAccepted);
+    socketInstance.off('callEnded', onCallEnded);
     socketWired = false;
   }
+
   socketInstance = s;
   if (s) wireCallSocketHandlers();
 }
@@ -148,24 +169,8 @@ function resetNavigateGuard() {
 export function wireCallSocketHandlers() {
   if (!socketInstance) return;
 
-  socketInstance.on('callAccepted', ({roomId, userId, callType}) => {
-    if (!currentCallData || currentCallData.roomId !== roomId) return;
-
-    if (!currentCallData.isAnswered) {
-      currentCallData.isAnswered = true;
-      currentCallData.startTime = Date.now();
-      currentCallData.callType = callType;
-      safeNavigateToZego(currentCallData);
-    }
-  });
-
-  socketInstance.on('callEnded', ({roomId}) => {
-    if (!currentCallData || currentCallData.roomId !== roomId) return;
-    if (!currentCallData) return;
-    closeCallKeepUI(currentCallData.uuid);
-    // currentCallData = null;
-    resetNavigateGuard();
-  });
+  socketInstance.on('callAccepted', onCallAccepted);
+  socketInstance.on('callEnded', onCallEnded);
 
   socketWired = true;
 }
@@ -268,8 +273,8 @@ export function endCall(uuid?: string) {
 
 export function teardownCallKeep() {
   if (socketInstance && socketWired) {
-    socketInstance.off('callAccepted');
-    socketInstance.off('callEnded');
+    socketInstance.off('callAccepted', onCallAccepted);
+    socketInstance.off('callEnded', onCallEnded);
     socketWired = false;
   }
 }
