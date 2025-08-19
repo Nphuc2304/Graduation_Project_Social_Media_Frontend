@@ -53,11 +53,13 @@ export function setCallKeepSocket(s: Socket | null) {
   if (socketInstance) {
     socketInstance.off('callAccepted', onCallAccepted);
     socketInstance.off('callEnded', onCallEnded);
+    socketInstance.off('callDeclined', onCallDeclined);
   }
   socketInstance = s;
   if (s) {
     s.on('callAccepted', onCallAccepted);
     s.on('callEnded', onCallEnded);
+    s.on('callDeclined', onCallDeclined);
   }
 }
 
@@ -68,6 +70,34 @@ export function setCallKeepUserId(id: string) {
 function getSelfId(): string {
   const q: any = (socketInstance as any)?.io?.opts?.query;
   return callkeepUserId || q?.userId || '';
+}
+
+function onCallDeclined(payload: {roomId: string; callUuid?: string}) {
+  if (!currentCallData) return;
+  if (String(payload.roomId) !== String(currentCallData.roomId)) return;
+
+  const g = ensureGuard(currentCallData.uuid);
+  closeCallKeepUI(currentCallData.uuid);
+
+  // Caller là người "end" chính thức 1 lần duy nhất
+  if (g && !g.endSent) {
+    g.endSent = true;
+    api
+      .post('/calls/end', {
+        roomId: currentCallData.roomId,
+        userId: currentCallData.selfId,
+        missed: true, // tuỳ bạn muốn hiển thị "bị từ chối" hay "nhỡ"
+        duration: 0,
+        callType: currentCallData.callType,
+        callUuid: currentCallData.uuid,
+      })
+      .catch(e =>
+        console.warn(
+          '[caller/end after decline] api error:',
+          (e as any)?.message,
+        ),
+      );
+  }
 }
 
 /** Caller nhận được callee đã bấm “Nghe” → đóng UI CallKeep, vào Zego */
@@ -156,28 +186,42 @@ export async function setupCallKeep() {
   // Không nghe/đóng UI: gọi API end (missed) 1 lần/uuid
   RNCallKeep.addEventListener('endCall', async () => {
     if (!currentCallData) return;
-    const {roomId, selfId, callType, uuid} = currentCallData;
+    const {roomId, selfId, callType, uuid, isCaller} = currentCallData;
 
     const g = ensureGuard(uuid);
     if (!g) return;
 
-    // Nếu đã accept rồi thì không phải missed; Zego sẽ gửi `/calls/end` khi user bấm kết thúc.
+    // Nếu đã "Nghe" rồi thì CallKeep UI đóng do Zego -> không làm gì ở đây
     if (g.acceptSent) return;
 
-    if (g.endSent) return;
-    g.endSent = true;
-
-    try {
-      await api.post('/calls/end', {
-        roomId,
-        userId: selfId,
-        missed: true,
-        duration: 0,
-        callType,
-        callUuid: uuid,
-      });
-    } catch (e) {
-      console.warn('[end] api error:', (e as any)?.message);
+    if (isCaller) {
+      if (g.endSent) return;
+      g.endSent = true;
+      try {
+        await api.post('/calls/end', {
+          roomId,
+          userId: selfId,
+          missed: false,
+          duration: 0,
+          callType,
+          callUuid: uuid,
+        });
+      } catch (e) {
+        console.warn('[end/caller] api error:', (e as any)?.message);
+      }
+    } else {
+      if (g.endSent) return;
+      g.endSent = true;
+      try {
+        await api.post('/calls/decline', {
+          roomId,
+          userId: selfId,
+          callType,
+          callUuid: uuid,
+        });
+      } catch (e) {
+        console.warn('[decline/callee] api error:', (e as any)?.message);
+      }
     }
   });
 }
