@@ -1,6 +1,7 @@
 import RNCallKeep from 'react-native-callkeep';
 import {Permission, PermissionsAndroid, Platform} from 'react-native';
 import {GlobalAlertManager} from '../components/Global/AlertModal';
+import {startKeepAlive} from '../src/native/KeepAlive';
 
 export const requestCallPermissions = async () => {
   if (Platform.OS !== 'android') return true;
@@ -129,9 +130,7 @@ export const showIncomingCall = ({
   name: string;
 }) => {
   try {
-    console.log(
-      `[CallKeep] Displaying incoming call: ${name} (${handle}) UUID: ${uuid}`,
-    );
+    startKeepAlive('Cuộc gọi đến', 'Đang đổ chuông…');
     RNCallKeep.displayIncomingCall(uuid, handle, name, 'generic', true);
   } catch (err) {
     console.error('[CallKeep] Failed to display incoming call:', err);

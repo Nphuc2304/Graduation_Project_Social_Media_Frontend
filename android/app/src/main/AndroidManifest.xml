@@ -8,6 +8,7 @@
   <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
   <uses-permission android:name="android.permission.RECORD_AUDIO" />
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
   <uses-permission android:name="android.permission.ANSWER_PHONE_CALLS" />
   <uses-permission android:name="android.permission.READ_PHONE_STATE" />
   <uses-permission android:name="android.permission.CALL_PHONE" />
@@ -103,6 +104,11 @@
           <action android:name="com.google.firebase.MESSAGING_EVENT" />
         </intent-filter>
       </service>
+
+      <service
+        android:name=".keepalive.KeepAliveService"
+        android:exported="false"
+        android:foregroundServiceType="dataSync" />
 
       <receiver android:exported="true" android:enabled="true" android:name="io.invertase.firebase.messaging.ReactNativeFirebaseMessagingReceiver">
           <intent-filter>
