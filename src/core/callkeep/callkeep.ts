@@ -2,8 +2,8 @@ import RNCallKeep, {IOptions} from 'react-native-callkeep';
 import 'react-native-get-random-values';
 import {v4 as uuidv4} from 'uuid';
 import {navigationRef} from '../../NavigationService';
-import {useSocket} from '@services/SocketContext';
 import {Socket} from 'socket.io-client';
+import {startKeepAlive, stopKeepAlive} from '../../../src/native/KeepAlive';
 
 type CallType = 'video' | 'voice';
 
@@ -75,6 +75,7 @@ function onCallAccepted({roomId, userId, callType}: any) {
 function onCallEnded({roomId}: any) {
   if (!currentCallData || currentCallData.roomId !== roomId) return;
   closeCallKeepUI(currentCallData.uuid);
+  stopKeepAlive();
 }
 
 function closeCallKeepUI(uuid?: string) {
@@ -126,6 +127,7 @@ export async function setupCallKeep() {
       duration: 0,
       callType: currentCallData.callType,
     });
+    stopKeepAlive();
   });
 }
 
@@ -188,6 +190,11 @@ export function startOutgoingCall({
   calleeName: string;
   image?: string;
 }) {
+  startKeepAlive(
+    hasVideo ? 'Đang kết nối video call…' : 'Đang kết nối voice call…',
+    'Giữ kết nối ổn định trong khi chờ đối phương.',
+  );
+
   currentCallData = {
     uuid,
     roomId,
