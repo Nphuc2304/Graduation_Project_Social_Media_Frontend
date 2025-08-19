@@ -7,7 +7,6 @@ import android.content.Intent
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
-import <your.package>.R
 
 class KeepAliveService : Service() {
   companion object {
@@ -38,7 +37,8 @@ class KeepAliveService : Service() {
     val notif = NotificationCompat.Builder(this, CHANNEL_ID)
       .setContentTitle(title)
       .setContentText(text)
-      .setSmallIcon(R.drawable.ic_notification) // đặt icon tồn tại trong res
+      // dùng icon hệ thống để khỏi phụ thuộc R của app
+      .setSmallIcon(android.R.drawable.stat_sys_phone_call)
       .setOngoing(true)
       .setPriority(NotificationCompat.PRIORITY_HIGH)
       .build()
