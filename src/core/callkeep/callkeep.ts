@@ -41,7 +41,7 @@ let callkeepUserId: string | null = null;
 
 export function setCallKeepSocket(s: Socket | null) {
   if (socketInstance && socketWired) {
-    socketInstance.off('incomingCall', onIncomingCallFromServer);
+    // socketInstance.off('incomingCall', onIncomingCallFromServer);
     socketInstance.off('callAccepted');
     socketInstance.off('callEnded');
     socketWired = false;
@@ -149,8 +149,6 @@ function resetNavigateGuard() {
 export function wireCallSocketHandlers() {
   if (!socketInstance) return;
 
-  socketInstance.on('incomingCall', onIncomingCallFromServer);
-
   socketInstance.on('callAccepted', ({roomId, userId, callType}) => {
     if (!currentCallData || currentCallData.roomId !== roomId) return;
 
@@ -249,10 +247,6 @@ export function startOutgoingCall({
     isCaller: true,
     isAnswered: false,
   };
-  socketInstance?.emit('joinRoom', {
-    roomId,
-    userId: selfId,
-  });
   RNCallKeep.startCall(uuid, callee, calleeName, 'number', hasVideo);
   return uuid;
 }
@@ -273,38 +267,10 @@ export function endCall(uuid?: string) {
   }, 5000);
 }
 
-export function endAllCalls() {
-  RNCallKeep.endAllCalls();
-}
-
 export function teardownCallKeep() {
   if (socketInstance && socketWired) {
-    socketInstance.off('incomingCall', onIncomingCallFromServer);
     socketInstance.off('callAccepted');
     socketInstance.off('callEnded');
     socketWired = false;
   }
-}
-
-function onIncomingCallFromServer({
-  callerId,
-  callerName,
-  type,
-  roomId,
-  callUuid,
-  image,
-}: any) {
-  const selfId = getSelfId();
-  if (selfId) {
-    socketInstance?.emit('joinRoom', {roomId, userId: selfId});
-  }
-  showIncomingCall({
-    uuid: callUuid || uuidv4(),
-    callerName,
-    handle: callerId,
-    hasVideo: type === 'video',
-    roomId,
-    callerId,
-    image,
-  });
 }
