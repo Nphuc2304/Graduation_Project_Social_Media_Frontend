@@ -23,7 +23,9 @@ export const useNotificationHandler = (onNavigate: (data: any) => void) => {
   const handleIncomingCallPush = useCallback(
     async (data: any) => {
       await setupCallKeep();
+
       connectToSocket();
+
       if (user?._id) setCallKeepUserId(user._id);
 
       showIncomingCall({
@@ -31,7 +33,7 @@ export const useNotificationHandler = (onNavigate: (data: any) => void) => {
         callerName: data.userName || 'Cuộc gọi tới',
         handle: data.userId,
         hasVideo: (data.callType || 'video') === 'video',
-        roomId: data.callId || data.roomId,
+        roomId: data.roomId,
         callerId: data.userId,
         image: data.image,
       });
