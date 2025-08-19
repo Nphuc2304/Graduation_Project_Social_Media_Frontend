@@ -52,8 +52,8 @@ export const SocketProvider = ({children}: {children: React.ReactNode}) => {
     if (existing?.connected) {
       socketRef.current = existing;
       setSocket(existing);
-      setCallKeepSocket(existing);
       setCallKeepUserId(user._id);
+      setCallKeepSocket(existing);
       return;
     }
     if (isConnecting()) {
@@ -69,11 +69,10 @@ export const SocketProvider = ({children}: {children: React.ReactNode}) => {
       // path: '/socket.io',              // nếu BE dùng path custom thì bật
     });
 
-    setCallKeepSocket(s);
-
     s.on('connect', () => {
       console.log('✅ Socket connected!', s.id);
       setCallKeepUserId(user._id);
+      setCallKeepSocket(s);
       setConnecting(false);
     });
 
@@ -95,13 +94,13 @@ export const SocketProvider = ({children}: {children: React.ReactNode}) => {
     const s = socketRef.current ?? getGlobalSocket();
     if (!s) return;
 
+    setCallKeepSocket(null);
     s.removeAllListeners(); // dọn listener để tránh rò rỉ
     s.disconnect();
 
     if (socketRef.current === s) socketRef.current = null;
     if (getGlobalSocket() === s) setGlobalSocket(null);
     setSocket(null);
-    setCallKeepSocket(null);
     setConnecting(false);
     console.log('🔌 Socket manually disconnected.');
   };
