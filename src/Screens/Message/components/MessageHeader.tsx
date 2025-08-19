@@ -67,15 +67,15 @@ const MessageHeader: React.FC<MessageHeaderProps> = ({
       image: user1.profilePic,
     });
 
-    // emitGlobal('incomingCall', {
-    //   callerId: userC?._id,
-    //   callerName: userC?.username,
-    //   callerAvatar: userC?.profilePic,
-    //   type: 'video',
-    //   roomId: room._id,
-    //   callUUID,
-    //   accepted: false,
-    // });
+    emitGlobal('incomingCall', {
+      callerId: userC?._id,
+      callerName: userC?.username,
+      callerAvatar: userC?.profilePic,
+      type: 'video',
+      roomId: room._id,
+      callUUID,
+      accepted: false,
+    });
   };
 
   /** Gọi thoại */
@@ -93,15 +93,15 @@ const MessageHeader: React.FC<MessageHeaderProps> = ({
       calleeName: user1.username ?? 'Người nhận',
     });
 
-    // emitGlobal('incomingCall', {
-    //   callerId: userC._id,
-    //   callerName: userC.username,
-    //   callerAvatar: userC.profilePic,
-    //   type: 'voice',
-    //   roomId: room._id,
-    //   callUUID,
-    //   accepted: false,
-    // });
+    emitGlobal('incomingCall', {
+      callerId: userC._id,
+      callerName: userC.username,
+      callerAvatar: userC.profilePic,
+      type: 'voice',
+      roomId: room._id,
+      callUUID,
+      accepted: false,
+    });
   };
 
   const shouldShowCallIcons =
