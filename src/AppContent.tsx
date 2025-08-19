@@ -80,7 +80,6 @@ const AppContent = () => {
         break;
       case 'incoming_call':
       case 'call': {
-        connectToSocket();
         if (user?._id) setCallKeepUserId(user._id);
         showIncomingCall({
           uuid: modalData.data.callUuid,
