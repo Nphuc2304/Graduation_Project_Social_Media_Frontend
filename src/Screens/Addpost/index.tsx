@@ -122,7 +122,7 @@ export const AddPost = () => {
       setIsInitialLoading(true);
       
       const result = await CameraRoll.getPhotos({
-        first: 1000,
+        first: 500,
         assetType: getAssetType(filter),
         groupTypes: 'All',
         include: ['filename', 'fileSize', 'location', 'imageSize', 'playableDuration'],
@@ -138,11 +138,6 @@ export const AddPost = () => {
       // Show only first batch initially for fast UI
       const initialBatch = allMedia.slice(0, DISPLAY_BATCH_SIZE);
       setDisplayedMedias(initialBatch);
-      
-      // Auto-select first item
-      if (initialBatch.length > 0) {
-        setSelectedMedia(initialBatch[0]);
-      }
       
       // If there are still more pages, fetch them in background
       if (result.page_info.has_next_page && result.page_info.end_cursor) {
@@ -161,7 +156,7 @@ export const AddPost = () => {
   const fetchRemainingMediaInBackground = async (cursor: string, currentMedia: PhotoIdentifier[]) => {
     try {
       const result = await CameraRoll.getPhotos({
-        first: 1000,
+        first: 500,
         assetType: getAssetType(filter),
         after: cursor,
         groupTypes: 'All',
