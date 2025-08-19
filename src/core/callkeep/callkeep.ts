@@ -42,6 +42,7 @@ export function setCallKeepSocket(s: Socket | null) {
   }
   socketInstance = s;
   if (s) {
+    s.on('callAccepted', onCallAccepted);
     s.on('callEnded', onCallEnded);
   }
 }
@@ -53,6 +54,19 @@ export function setCallKeepUserId(id: string) {
 function getSelfId(): string {
   const q: any = (socketInstance as any)?.io?.opts?.query;
   return callkeepUserId || q?.userId || '';
+}
+
+function onCallAccepted(payload: {
+  roomId: string;
+  userId: string;
+  callType?: CallType;
+}) {
+  if (!currentCallData) return;
+  if (payload?.callType) {
+    (currentCallData as any).callType = payload.callType;
+  }
+  closeCallKeepUI(currentCallData.uuid);
+  navigateToZego(currentCallData);
 }
 
 function onCallEnded(payload: {roomId: string}) {
