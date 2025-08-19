@@ -3,7 +3,10 @@ import {io, Socket} from 'socket.io-client';
 import {BASE_URL} from '../services/api';
 import {useSelector} from 'react-redux';
 import {RootState} from '../services/store';
-import {setCallKeepUserId} from '../src/core/callkeep/callkeep';
+import {
+  setCallKeepSocket,
+  setCallKeepUserId,
+} from '../src/core/callkeep/callkeep';
 
 interface SocketContextType {
   socket: Socket | null;
@@ -50,6 +53,7 @@ export const SocketProvider = ({children}: {children: React.ReactNode}) => {
       socketRef.current = existing;
       setSocket(existing);
       setCallKeepUserId(user._id);
+      setCallKeepSocket(existing);
       return;
     }
     if (isConnecting()) {
@@ -60,15 +64,15 @@ export const SocketProvider = ({children}: {children: React.ReactNode}) => {
     setConnecting(true);
     const s = io(BASE_URL, {
       transports: ['websocket'],
-      auth: {userId: user._id}, // BE đọc handshake.auth.userId
-      query: {userId: user._id}, // và cả handshake.query.userId
-      // path: '/socket.io',              // nếu BE dùng path custom thì bật
+      auth: {userId: user._id},
+      query: {userId: user._id},
     });
 
     s.on('connect', () => {
       console.log('✅ Socket connected!', s.id);
       setCallKeepUserId(user._id);
       setConnecting(false);
+      setCallKeepSocket(s);
     });
 
     s.on('disconnect', reason => {
@@ -89,7 +93,8 @@ export const SocketProvider = ({children}: {children: React.ReactNode}) => {
     const s = socketRef.current ?? getGlobalSocket();
     if (!s) return;
 
-    s.removeAllListeners(); // dọn listener để tránh rò rỉ
+    setCallKeepSocket(null);
+    s.removeAllListeners();
     s.disconnect();
 
     if (socketRef.current === s) socketRef.current = null;

@@ -77,10 +77,6 @@ function onCallEnded({roomId}: any) {
   closeCallKeepUI(currentCallData.uuid);
 }
 
-function calcDurationSec(d: CurrentCallData) {
-  return d.startTime ? Math.floor((Date.now() - d.startTime) / 1000) : 0;
-}
-
 function closeCallKeepUI(uuid?: string) {
   if (uuid) RNCallKeep.endCall(uuid);
   else if (currentCallData?.uuid) RNCallKeep.endCall(currentCallData.uuid);
