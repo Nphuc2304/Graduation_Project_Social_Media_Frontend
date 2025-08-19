@@ -1,4 +1,4 @@
-package com.graduation_project_social_media_frontend
+package com.graduation_project_social_media_frontend.keepalive
 
 import android.app.NotificationChannel
 import android.app.NotificationManager

@@ -1,4 +1,4 @@
-package com.graduation_project_social_media_frontend
+package com.graduation_project_social_media_frontend.keepalive
 
 import android.content.Intent
 import androidx.core.content.ContextCompat
