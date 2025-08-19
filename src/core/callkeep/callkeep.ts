@@ -3,6 +3,7 @@ import 'react-native-get-random-values';
 import {v4 as uuidv4} from 'uuid';
 import {navigationRef} from '../../NavigationService';
 import {Socket} from 'socket.io-client';
+import api from '../../../services/axiosInstance';
 
 type CallType = 'video' | 'voice';
 
@@ -89,23 +90,44 @@ export async function setupCallKeep() {
   RNCallKeep.setAvailable(true);
   initialized = true;
 
-  // Nhấn "Nghe": đóng UI CallKeep và vào Zego (phần còn lại Zego xử lý)
-  RNCallKeep.addEventListener('answerCall', () => {
+  // Nhấn "Nghe": gọi API accept -> đóng UI -> vào Zego
+  RNCallKeep.addEventListener('answerCall', async () => {
     if (!currentCallData) return;
-    closeCallKeepUI(currentCallData.uuid);
+    const {roomId, selfId, callType, uuid} = currentCallData;
+
+    try {
+      await api.post('/calls/accept', {
+        roomId,
+        userId: selfId,
+        callType,
+        callUuid: uuid,
+      });
+    } catch (e) {
+      // không chặn điều hướng, BE vẫn có socket/push fallback
+      console.warn('[accept] api error:', (e as any)?.message);
+    }
+
+    closeCallKeepUI(uuid);
     navigateToZego(currentCallData);
   });
 
-  // Không nghe/đóng UI: emit callEnded (missed) là đủ
-  RNCallKeep.addEventListener('endCall', () => {
+  // Không nghe/đóng UI: gọi API end (missed)
+  RNCallKeep.addEventListener('endCall', async () => {
     if (!currentCallData) return;
-    socketInstance?.emit('callEnded', {
-      roomId: currentCallData.roomId,
-      senderId: currentCallData.selfId,
-      missed: true,
-      duration: 0,
-      callType: currentCallData.callType,
-    });
+    const {roomId, selfId, callType, uuid} = currentCallData;
+
+    try {
+      await api.post('/calls/end', {
+        roomId,
+        userId: selfId,
+        missed: true,
+        duration: 0,
+        callType,
+        callUuid: uuid,
+      });
+    } catch (e) {
+      console.warn('[end] api error:', (e as any)?.message);
+    }
   });
 }
 
@@ -129,6 +151,7 @@ export function showIncomingCall({
 }) {
   const selfId = getSelfId();
   if (selfId) {
+    // joinRoom để nếu socket còn sống, bạn vẫn nhận được event realtime
     socketInstance?.emit('joinRoom', {roomId, userId: selfId});
   }
 
