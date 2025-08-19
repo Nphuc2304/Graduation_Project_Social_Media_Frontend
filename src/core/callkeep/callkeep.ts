@@ -35,7 +35,6 @@ const options: IOptions = {
 let currentCallData: CurrentCallData | null = null;
 let callkeepUserId: string | null = null;
 let socketInstance: Socket | null = null;
-let isNavigatingToCall = false;
 let initialized = false;
 
 // 🔹 Export setter để Provider bơm socket vào
@@ -76,7 +75,6 @@ function onCallAccepted({roomId, userId, callType}: any) {
 function onCallEnded({roomId}: any) {
   if (!currentCallData || currentCallData.roomId !== roomId) return;
   closeCallKeepUI(currentCallData.uuid);
-  // có thể clear state ở đây nếu bạn muốn
 }
 
 function calcDurationSec(d: CurrentCallData) {
@@ -89,20 +87,16 @@ function closeCallKeepUI(uuid?: string) {
 }
 
 function safeNavigateToZego(d: CurrentCallData) {
-  if (isNavigatingToCall) return;
-  isNavigatingToCall = true;
-  setTimeout(() => {
-    navigationRef.current?.navigate('ZegoCallScreen', {
-      selfId: d.selfId,
-      selfName: d.selfName,
-      peerId: d.peerId,
-      peerName: d.peerName,
-      callID: d.roomId,
-      image: d.image ?? null,
-      isCaller: d.isCaller,
-      callType: d.callType,
-    });
-  }, 250);
+  navigationRef.current?.navigate('ZegoCallScreen', {
+    selfId: d.selfId,
+    selfName: d.selfName,
+    peerId: d.peerId,
+    peerName: d.peerName,
+    callID: d.roomId,
+    image: d.image ?? null,
+    isCaller: d.isCaller,
+    callType: d.callType,
+  });
 }
 
 export async function setupCallKeep() {

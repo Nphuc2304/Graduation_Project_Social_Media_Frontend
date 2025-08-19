@@ -24,9 +24,7 @@ const SocketContext = createContext<SocketContextType>({
   leaveRoom: () => {},
 });
 
-// ===== Singleton + lock để tránh tạo nhiều socket khi App & hook cùng gọi =====
 declare global {
-  // eslint-disable-next-line no-var
   var __GLOBAL_SOCKET__: Socket | null | undefined;
   var __SOCKET_CONNECTING__: boolean | undefined;
 }
@@ -95,7 +93,7 @@ export const SocketProvider = ({children}: {children: React.ReactNode}) => {
     if (!s) return;
 
     setCallKeepSocket(null);
-    s.removeAllListeners(); // dọn listener để tránh rò rỉ
+    s.removeAllListeners();
     s.disconnect();
 
     if (socketRef.current === s) socketRef.current = null;
