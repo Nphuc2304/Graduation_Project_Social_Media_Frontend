@@ -3,7 +3,6 @@ import 'react-native-get-random-values';
 import {v4 as uuidv4} from 'uuid';
 import {navigationRef} from '../../NavigationService';
 import {Socket} from 'socket.io-client';
-import api from '../../../services/axiosInstance';
 
 type CallType = 'video' | 'voice';
 
@@ -17,8 +16,6 @@ type CurrentCallData = {
   image?: string;
   callType: CallType;
   isCaller: boolean;
-  isAnswered?: boolean;
-  startTime?: number;
 };
 
 const options: IOptions = {
@@ -37,51 +34,13 @@ let callkeepUserId: string | null = null;
 let socketInstance: Socket | null = null;
 let initialized = false;
 
-/* ===================== REST fallback qua axiosInstance ===================== */
-async function restAccept(
-  roomId: string,
-  userId: string,
-  callType: CallType,
-  callUuid?: string,
-) {
-  try {
-    await api.post('/calls/accept', {roomId, userId, callType, callUuid});
-  } catch (e: any) {
-    console.warn('[REST accept] fail:', e?.message || e);
-  }
-}
-
-async function restEnd(
-  roomId: string,
-  userId: string,
-  missed: boolean,
-  duration: number,
-  callType: CallType,
-  callUuid?: string,
-) {
-  try {
-    await api.post('/calls/end', {
-      roomId,
-      userId,
-      missed,
-      duration,
-      callType,
-      callUuid,
-    });
-  } catch (e: any) {
-    console.warn('[REST end] fail:', e?.message || e);
-  }
-}
-
-/* ===================== Socket binding ===================== */
+/* ===================== Socket binding (1 listener duy nhất) ===================== */
 export function setCallKeepSocket(s: Socket | null) {
   if (socketInstance) {
-    socketInstance.off('callAccepted', onCallAccepted);
     socketInstance.off('callEnded', onCallEnded);
   }
   socketInstance = s;
   if (s) {
-    s.on('callAccepted', onCallAccepted);
     s.on('callEnded', onCallEnded);
   }
 }
@@ -95,33 +54,11 @@ function getSelfId(): string {
   return callkeepUserId || q?.userId || '';
 }
 
-function onCallAccepted(payload: {
-  roomId: string;
-  userId: string;
-  callType: CallType;
-}) {
+function onCallEnded(payload: {roomId: string}) {
   if (!currentCallData) return;
   if (String(payload.roomId) !== String(currentCallData.roomId)) return;
-
-  currentCallData.isAnswered = true;
-  currentCallData.startTime = Date.now();
-  currentCallData.callType = payload.callType;
-
+  // peer đã kết thúc trước khi mình bấm nghe -> đóng UI
   closeCallKeepUI(currentCallData.uuid);
-  navigateToZego(currentCallData);
-}
-
-function onCallEnded(payload: {
-  roomId: string;
-  endedBy?: string;
-  missed?: boolean;
-  duration?: number;
-}) {
-  if (!currentCallData) return;
-  if (String(payload.roomId) !== String(currentCallData.roomId)) return;
-
-  closeCallKeepUI(currentCallData.uuid);
-  // Zego screen sẽ tự goBack khi nhận 'callEnded' đúng roomId
 }
 
 /* ===================== Helpers ===================== */
@@ -152,46 +89,22 @@ export async function setupCallKeep() {
   RNCallKeep.setAvailable(true);
   initialized = true;
 
-  // Người nhận bấm "Nghe"
-  RNCallKeep.addEventListener('answerCall', async () => {
+  // Nhấn "Nghe": đóng UI CallKeep và vào Zego (phần còn lại Zego xử lý)
+  RNCallKeep.addEventListener('answerCall', () => {
     if (!currentCallData) return;
-    const {roomId, selfId, callType, uuid} = currentCallData;
-
-    // REST fallback trước (trường hợp socket suspend)
-    await restAccept(roomId, selfId, callType, uuid);
-
-    // Bonus realtime nếu socket đang sống
-    socketInstance?.emit('acceptCall', {roomId, userId: selfId, callType});
-
-    // Đánh dấu đã trả lời để endCall không gửi missed
-    currentCallData.isAnswered = true;
-    currentCallData.startTime = Date.now();
-
-    closeCallKeepUI(uuid);
+    closeCallKeepUI(currentCallData.uuid);
     navigateToZego(currentCallData);
   });
 
-  // UI CallKeep bị đóng (Decline/OS) -> chỉ gửi missed nếu CHƯA answer
-  RNCallKeep.addEventListener('endCall', async ({callUUID}) => {
+  // Không nghe/đóng UI: emit callEnded (missed) là đủ
+  RNCallKeep.addEventListener('endCall', () => {
     if (!currentCallData) return;
-
-    const {roomId, selfId, callType, isAnswered, uuid} = currentCallData;
-
-    if (isAnswered) {
-      // Đã trả lời: kết thúc sẽ do Zego screen gửi /calls/end
-      return;
-    }
-
-    // Missed
-    await restEnd(roomId, selfId, true, 0, callType, uuid);
-
-    // Bonus realtime
     socketInstance?.emit('callEnded', {
-      roomId,
-      senderId: selfId,
+      roomId: currentCallData.roomId,
+      senderId: currentCallData.selfId,
       missed: true,
       duration: 0,
-      callType,
+      callType: currentCallData.callType,
     });
   });
 }
@@ -229,8 +142,8 @@ export function showIncomingCall({
     image,
     callType: hasVideo ? 'video' : 'voice',
     isCaller: false,
-    isAnswered: false,
   };
+
   RNCallKeep.displayIncomingCall(uuid, handle, callerName, 'generic', hasVideo);
   return uuid;
 }
@@ -266,7 +179,6 @@ export function startOutgoingCall({
     image,
     callType: hasVideo ? 'video' : 'voice',
     isCaller: true,
-    isAnswered: false,
   };
 
   socketInstance?.emit('joinRoom', {roomId, userId: selfId});
