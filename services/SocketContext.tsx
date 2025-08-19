@@ -1,10 +1,4 @@
-import React, {
-  createContext,
-  useContext,
-  useRef,
-  useState,
-  useCallback,
-} from 'react';
+import React, {createContext, useContext, useRef, useState} from 'react';
 import {io, Socket} from 'socket.io-client';
 import {BASE_URL} from '../services/api';
 import {useSelector} from 'react-redux';
@@ -12,8 +6,6 @@ import {RootState} from '../services/store';
 import {
   setCallKeepSocket,
   setCallKeepUserId,
-  setupCallKeep,
-  showIncomingCall,
 } from '../src/core/callkeep/callkeep';
 
 interface SocketContextType {
@@ -32,6 +24,7 @@ const SocketContext = createContext<SocketContextType>({
   leaveRoom: () => {},
 });
 
+// ===== Singleton + lock để tránh tạo nhiều socket khi App & hook cùng gọi =====
 declare global {
   // eslint-disable-next-line no-var
   var __GLOBAL_SOCKET__: Socket | null | undefined;
@@ -52,33 +45,6 @@ export const SocketProvider = ({children}: {children: React.ReactNode}) => {
   const [socket, setSocket] = useState<Socket | null>(null);
   const user = useSelector((state: RootState) => state.user.user);
 
-  // Handler duy nhất: nhận cuộc gọi khi app foreground
-  const onIncomingCall = useCallback(
-    (payload: {
-      callerId: string;
-      callerName: string;
-      type: 'video' | 'voice';
-      roomId: string;
-      callUuid?: string;
-      image?: string;
-    }) => {
-      if (!user?._id) return;
-      // đảm bảo CallKeep biết self hiện tại
-      setCallKeepUserId(user._id);
-      // Hiện UI cuộc gọi hệ thống
-      showIncomingCall({
-        uuid: payload.callUuid,
-        callerName: payload.callerName,
-        handle: payload.callerId,
-        hasVideo: payload.type === 'video',
-        roomId: payload.roomId,
-        callerId: payload.callerId,
-        image: payload.image,
-      });
-    },
-    [user?._id],
-  );
-
   const connectToSocket = () => {
     if (!user?._id) return;
 
@@ -86,40 +52,28 @@ export const SocketProvider = ({children}: {children: React.ReactNode}) => {
     if (existing?.connected) {
       socketRef.current = existing;
       setSocket(existing);
-
-      // Cắm CallKeep
       setCallKeepUserId(user._id);
       setCallKeepSocket(existing);
-      setupCallKeep();
-
-      // Đảm bảo chỉ 1 listener
-      existing.off('incomingCall', onIncomingCall);
-      existing.on('incomingCall', onIncomingCall);
       return;
     }
-    if (isConnecting()) return;
+    if (isConnecting()) {
+      // đã có nơi khác gọi connect rồi -> không tạo thêm
+      return;
+    }
 
     setConnecting(true);
     const s = io(BASE_URL, {
       transports: ['websocket'],
       auth: {userId: user._id},
       query: {userId: user._id},
-      // path: '/socket.io',
     });
 
     s.on('connect', () => {
       console.log('✅ Socket connected!', s.id);
-
-      // Cắm CallKeep
       setCallKeepUserId(user._id);
-      setCallKeepSocket(s);
-      setupCallKeep();
-
       setConnecting(false);
+      setCallKeepSocket(s);
     });
-
-    // Lắng nghe incomingCall (foreground)
-    s.on('incomingCall', onIncomingCall);
 
     s.on('disconnect', reason => {
       console.log('❌ Socket disconnected!', reason);
@@ -139,12 +93,7 @@ export const SocketProvider = ({children}: {children: React.ReactNode}) => {
     const s = socketRef.current ?? getGlobalSocket();
     if (!s) return;
 
-    // Tháo CallKeep socket binding
     setCallKeepSocket(null);
-
-    // Tháo listener foreground
-    s.off('incomingCall', onIncomingCall);
-
     s.removeAllListeners();
     s.disconnect();
 
