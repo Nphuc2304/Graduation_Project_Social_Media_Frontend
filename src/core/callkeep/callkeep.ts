@@ -2,6 +2,7 @@ import RNCallKeep, {IOptions} from 'react-native-callkeep';
 import 'react-native-get-random-values';
 import {v4 as uuidv4} from 'uuid';
 import {navigationRef} from '../../NavigationService';
+import {useSocket} from '@services/SocketContext';
 import {Socket} from 'socket.io-client';
 
 type CallType = 'video' | 'voice';
@@ -31,76 +32,65 @@ const options: IOptions = {
   },
 };
 
-let initialized = (globalThis as any).__CK_INIT__ ?? false;
-let socketWired = false;
 let currentCallData: CurrentCallData | null = null;
-let suppressNextEndEvent = false;
-
-let socketInstance: Socket | null = null;
 let callkeepUserId: string | null = null;
+let socketInstance: Socket | null = null;
+let isNavigatingToCall = false;
+let initialized = false;
 
-function onCallAccepted({roomId, userId, callType}: any) {
-  if (!currentCallData || currentCallData.roomId !== roomId) return;
-
-  if (!currentCallData.isAnswered) {
-    currentCallData.isAnswered = true;
-    currentCallData.startTime = Date.now();
-    currentCallData.callType = callType;
-    safeNavigateToZego(currentCallData);
-
-    closeCallKeepUI(currentCallData.uuid);
-  }
-}
-
-function onCallEnded({roomId}: any) {
-  if (!currentCallData || currentCallData.roomId !== roomId) return;
-  closeCallKeepUI(currentCallData.uuid);
-  resetNavigateGuard();
-}
-
+// 🔹 Export setter để Provider bơm socket vào
 export function setCallKeepSocket(s: Socket | null) {
-  if (socketInstance === s && socketWired) return;
-
-  if (socketInstance && socketWired) {
+  // gỡ listener cũ nếu có
+  if (socketInstance) {
     socketInstance.off('callAccepted', onCallAccepted);
     socketInstance.off('callEnded', onCallEnded);
-    socketWired = false;
   }
-
   socketInstance = s;
-  if (s) wireCallSocketHandlers();
+  if (s) {
+    s.on('callAccepted', onCallAccepted);
+    s.on('callEnded', onCallEnded);
+  }
 }
 
 export function setCallKeepUserId(id: string) {
   callkeepUserId = id;
 }
 
+function getSelfId(): string {
+  const q: any = (socketInstance as any)?.io?.opts?.query;
+  return callkeepUserId || q?.userId || '';
+}
+
+function onCallAccepted({roomId, userId, callType}: any) {
+  if (!currentCallData || currentCallData.roomId !== roomId) return;
+  if (currentCallData.isAnswered) return;
+
+  currentCallData.isAnswered = true;
+  currentCallData.startTime = Date.now();
+  currentCallData.callType = callType;
+
+  closeCallKeepUI(currentCallData.uuid);
+  safeNavigateToZego(currentCallData);
+}
+
+function onCallEnded({roomId}: any) {
+  if (!currentCallData || currentCallData.roomId !== roomId) return;
+  closeCallKeepUI(currentCallData.uuid);
+  // có thể clear state ở đây nếu bạn muốn
+}
+
 function calcDurationSec(d: CurrentCallData) {
   return d.startTime ? Math.floor((Date.now() - d.startTime) / 1000) : 0;
 }
 
-function emitCallEnded(d: CurrentCallData, missed = false) {
-  socketInstance?.emit('callEnded', {
-    roomId: d.roomId,
-    senderId: d.selfId,
-    missed,
-    duration: missed ? 0 : calcDurationSec(d),
-    callType: d.callType,
-  });
-}
-
 function closeCallKeepUI(uuid?: string) {
-  suppressNextEndEvent = true;
   if (uuid) RNCallKeep.endCall(uuid);
   else if (currentCallData?.uuid) RNCallKeep.endCall(currentCallData.uuid);
 }
 
-let isNavigatingToCall = false;
-
 function safeNavigateToZego(d: CurrentCallData) {
   if (isNavigatingToCall) return;
   isNavigatingToCall = true;
-
   setTimeout(() => {
     navigationRef.current?.navigate('ZegoCallScreen', {
       selfId: d.selfId,
@@ -117,13 +107,13 @@ function safeNavigateToZego(d: CurrentCallData) {
 
 export async function setupCallKeep() {
   if (initialized) return;
-
   await RNCallKeep.setup(options);
   RNCallKeep.setAvailable(true);
+  initialized = true;
 
   RNCallKeep.addEventListener('answerCall', () => {
-    if (!currentCallData) return;
-    if (currentCallData.isAnswered) return;
+    if (!currentCallData || currentCallData.isAnswered) return;
+
     currentCallData.isAnswered = true;
     currentCallData.startTime = Date.now();
 
@@ -133,51 +123,23 @@ export async function setupCallKeep() {
       callType: currentCallData.callType,
     });
 
+    closeCallKeepUI(currentCallData.uuid);
     safeNavigateToZego(currentCallData);
   });
 
   RNCallKeep.addEventListener('endCall', ({callUUID}) => {
-    if (
-      callUUID &&
-      currentCallData?.uuid &&
-      callUUID !== currentCallData.uuid
-    ) {
-      return;
-    }
-
-    if (suppressNextEndEvent) {
-      suppressNextEndEvent = false;
-      resetNavigateGuard();
-      return;
-    }
-
     if (currentCallData) {
-      emitCallEnded(currentCallData, !currentCallData.isAnswered);
-      // currentCallData = null;
-      resetNavigateGuard();
+      socketInstance?.emit('callEnded', {
+        roomId: currentCallData.roomId,
+        senderId: currentCallData.selfId,
+        missed: !currentCallData.isAnswered,
+        duration: currentCallData.isAnswered
+          ? calcDurationSec(currentCallData)
+          : 0,
+        callType: currentCallData.callType,
+      });
     }
   });
-
-  initialized = true;
-  (globalThis as any).__CK_INIT__ = true;
-}
-
-function resetNavigateGuard() {
-  isNavigatingToCall = false;
-}
-
-export function wireCallSocketHandlers() {
-  if (!socketInstance) return;
-
-  socketInstance.on('callAccepted', onCallAccepted);
-  socketInstance.on('callEnded', onCallEnded);
-
-  socketWired = true;
-}
-
-function getSelfId(): string {
-  const q: any = (socketInstance as any)?.io?.opts?.query;
-  return callkeepUserId || q?.userId || '';
 }
 
 export function showIncomingCall({
@@ -205,8 +167,8 @@ export function showIncomingCall({
   currentCallData = {
     uuid,
     roomId,
-    selfId: getSelfId(),
-    selfName: 'Me', // set từ profile context
+    selfId,
+    selfName: 'Me',
     peerId: callerId,
     peerName: callerName,
     image,
@@ -251,30 +213,10 @@ export function startOutgoingCall({
     isCaller: true,
     isAnswered: false,
   };
+
+  // (khuyến nghị) caller join room sớm
+  socketInstance?.emit('joinRoom', {roomId, userId: selfId});
+
   RNCallKeep.startCall(uuid, callee, calleeName, 'number', hasVideo);
   return uuid;
-}
-
-export function endCall(uuid?: string) {
-  const d = currentCallData;
-  const id = uuid ?? d?.uuid;
-  if (!id) return;
-
-  if (d) emitCallEnded(d, !d.isAnswered);
-  suppressNextEndEvent = true;
-  RNCallKeep.endCall(id);
-  setTimeout(() => {
-    if (currentCallData && currentCallData.uuid === id) {
-      // currentCallData = null;
-      resetNavigateGuard();
-    }
-  }, 5000);
-}
-
-export function teardownCallKeep() {
-  if (socketInstance && socketWired) {
-    socketInstance.off('callAccepted', onCallAccepted);
-    socketInstance.off('callEnded', onCallEnded);
-    socketWired = false;
-  }
 }
