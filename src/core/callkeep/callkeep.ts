@@ -35,9 +35,23 @@ let callkeepUserId: string | null = null;
 let socketInstance: Socket | null = null;
 let initialized = false;
 
-/* ===================== Socket binding (1 listener duy nhất) ===================== */
+/** ===== Guard để không gọi API lặp cho cùng 1 cuộc gọi (key = uuid) ===== */
+const callGuards = new Map<string, {acceptSent: boolean; endSent: boolean}>();
+function ensureGuard(uuid?: string) {
+  const key = uuid || currentCallData?.uuid;
+  if (!key) return null;
+  let g = callGuards.get(key);
+  if (!g) {
+    g = {acceptSent: false, endSent: false};
+    callGuards.set(key, g);
+  }
+  return g;
+}
+
+/* ============== Socket binding (chỉ lắng nghe 2 sự kiện) ============== */
 export function setCallKeepSocket(s: Socket | null) {
   if (socketInstance) {
+    socketInstance.off('callAccepted', onCallAccepted);
     socketInstance.off('callEnded', onCallEnded);
   }
   socketInstance = s;
@@ -56,23 +70,32 @@ function getSelfId(): string {
   return callkeepUserId || q?.userId || '';
 }
 
+/** Caller nhận được callee đã bấm “Nghe” → đóng UI CallKeep, vào Zego */
 function onCallAccepted(payload: {
   roomId: string;
   userId: string;
   callType?: CallType;
 }) {
   if (!currentCallData) return;
-  if (payload?.callType) {
-    (currentCallData as any).callType = payload.callType;
+  if (String(payload.roomId) !== String(currentCallData.roomId)) return;
+
+  if (payload.callType) {
+    currentCallData.callType = payload.callType;
   }
+  // Không gọi API ở đây, chỉ đóng UI & vào Zego (Zego sẽ lo phần còn lại)
   closeCallKeepUI(currentCallData.uuid);
   navigateToZego(currentCallData);
 }
 
+/** Peer kết thúc trước khi mình nghe → đóng UI (1 lần) */
 function onCallEnded(payload: {roomId: string}) {
   if (!currentCallData) return;
   if (String(payload.roomId) !== String(currentCallData.roomId)) return;
-  // peer đã kết thúc trước khi mình bấm nghe -> đóng UI
+
+  const g = ensureGuard();
+  if (g?.endSent) return; // đã xử lý end cho uuid này rồi
+  g!.endSent = true;
+
   closeCallKeepUI(currentCallData.uuid);
 }
 
@@ -104,31 +127,45 @@ export async function setupCallKeep() {
   RNCallKeep.setAvailable(true);
   initialized = true;
 
-  // Nhấn "Nghe": gọi API accept -> đóng UI -> vào Zego
+  // Nhấn "Nghe": gọi API accept (1 lần/uuid) → đóng UI → vào Zego
   RNCallKeep.addEventListener('answerCall', async () => {
     if (!currentCallData) return;
     const {roomId, selfId, callType, uuid} = currentCallData;
+    const g = ensureGuard(uuid);
+    if (!g) return;
 
-    try {
-      await api.post('/calls/accept', {
-        roomId,
-        userId: selfId,
-        callType,
-        callUuid: uuid,
-      });
-    } catch (e) {
-      // không chặn điều hướng, BE vẫn có socket/push fallback
-      console.warn('[accept] api error:', (e as any)?.message);
+    if (!g.acceptSent) {
+      g.acceptSent = true;
+      try {
+        await api.post('/calls/accept', {
+          roomId,
+          userId: selfId,
+          callType,
+          callUuid: uuid,
+        });
+      } catch (e) {
+        // Không block điều hướng
+        console.warn('[accept] api error:', (e as any)?.message);
+      }
     }
 
     closeCallKeepUI(uuid);
     navigateToZego(currentCallData);
   });
 
-  // Không nghe/đóng UI: gọi API end (missed)
+  // Không nghe/đóng UI: gọi API end (missed) 1 lần/uuid
   RNCallKeep.addEventListener('endCall', async () => {
     if (!currentCallData) return;
     const {roomId, selfId, callType, uuid} = currentCallData;
+
+    const g = ensureGuard(uuid);
+    if (!g) return;
+
+    // Nếu đã accept rồi thì không phải missed; Zego sẽ gửi `/calls/end` khi user bấm kết thúc.
+    if (g.acceptSent) return;
+
+    if (g.endSent) return;
+    g.endSent = true;
 
     try {
       await api.post('/calls/end', {
@@ -165,7 +202,7 @@ export function showIncomingCall({
 }) {
   const selfId = getSelfId();
   if (selfId) {
-    // joinRoom để nếu socket còn sống, bạn vẫn nhận được event realtime
+    // joinRoom để nếu socket còn sống, bạn vẫn nhận realtime
     socketInstance?.emit('joinRoom', {roomId, userId: selfId});
   }
 
@@ -180,6 +217,9 @@ export function showIncomingCall({
     callType: hasVideo ? 'video' : 'voice',
     isCaller: false,
   };
+
+  // reset/khởi tạo guard cho uuid mới
+  callGuards.set(uuid, {acceptSent: false, endSent: false});
 
   RNCallKeep.displayIncomingCall(uuid, handle, callerName, 'generic', hasVideo);
   return uuid;
@@ -218,8 +258,15 @@ export function startOutgoingCall({
     isCaller: true,
   };
 
+  callGuards.set(uuid, {acceptSent: false, endSent: false});
+
   socketInstance?.emit('joinRoom', {roomId, userId: selfId});
   RNCallKeep.startCall(uuid, callee, calleeName, 'number', hasVideo);
 
   return uuid;
+}
+
+/** (tuỳ nhu cầu) trạng thái hiện tại */
+export function getCurrentCallData() {
+  return currentCallData;
 }
