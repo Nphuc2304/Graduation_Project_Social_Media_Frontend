@@ -28,8 +28,14 @@ const LOGO_SHADOW = Platform.select({
   android: {elevation: 11},
 });
 
-const LoadingModal: React.FC<{withBackdrop?: boolean}> = ({
+interface LoadingModalProps {
+  withBackdrop?: boolean;
+  inline?: boolean;
+}
+
+const LoadingModal: React.FC<LoadingModalProps> = ({
   withBackdrop = false,
+  inline = false,
 }) => {
   const {theme} = useTheme();
   const color = Colors[theme];
@@ -68,10 +74,14 @@ const LoadingModal: React.FC<{withBackdrop?: boolean}> = ({
     outputRange: ['0deg', '360deg'],
   });
 
+  const getContainerStyle = () => {
+    if (withBackdrop) return styles.backdrop;
+    if (inline) return styles.inlineContainer;
+    return styles.container;
+  };
+
   return (
-    <View style={[
-      withBackdrop ? styles.backdrop : styles.container
-    ]}>
+    <View style={getContainerStyle()}>
       <Animated.View
         style={[
           styles.gradientBorder,
@@ -147,6 +157,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 99,
+  },
+  inlineContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 50,
   },
   gradientBorder: {
     width: OUTER_SIZE,

@@ -12,6 +12,7 @@ interface PostState {
   hasNextPage: boolean;
   totalItemsLoaded: number;
   firstPageItems: PostWithMedia[];
+  lastFetchedPage: number;
 }
 
 const initialState: PostState = {
@@ -23,6 +24,7 @@ const initialState: PostState = {
   hasNextPage: true,
   totalItemsLoaded: 0,
   firstPageItems: [],
+  lastFetchedPage: 0,
 };
 
 const postReducer = createSlice({
@@ -83,6 +85,16 @@ const postReducer = createSlice({
       state.totalItemsLoaded = 0;
       state.firstPageItems = [];
       state.error = null;
+      state.lastFetchedPage = 0;
+    },
+    resetPosts: state => {
+      state.posts = [];
+      state.page = 1;
+      state.hasNextPage = true;
+      state.totalItemsLoaded = 0;
+      state.firstPageItems = [];
+      state.error = null;
+      state.lastFetchedPage = 0;
     },
     incrementCommentCountByPostId: (state, action) => {
       const postId = action.payload;
@@ -134,13 +146,32 @@ const postReducer = createSlice({
       .addCase(fetchPostsWithMedia.fulfilled, (state, action) => {
         state.loading = false;
         const {items, pagination} = action.payload;
-        if (action.meta.arg.page > 1) {
-          state.posts.push(...items);
-        } else {
-          state.posts = items;
+        const requestedPage = action.meta.arg.page;
+        
+        // Prevent processing the same page multiple times
+        if (requestedPage <= state.lastFetchedPage && requestedPage > 1) {
+          console.warn(`Page ${requestedPage} already processed, skipping...`);
+          return;
         }
+        
+        if (requestedPage > 1) {
+          // Filter out any items that already exist to prevent duplicates
+          const existingIds = new Set(state.posts.map(post => post._id));
+          const newItems = items.filter(item => !existingIds.has(item._id));
+          
+          if (newItems.length > 0) {
+            state.posts.push(...newItems);
+            state.lastFetchedPage = requestedPage;
+          }
+        } else {
+          // For page 1, replace all posts
+          state.posts = items;
+          state.lastFetchedPage = 1;
+        }
+        
         state.page = pagination.currentPage;
         state.hasNextPage = pagination.hasNextPage;
+        state.totalItemsLoaded = state.posts.length;
       })
       .addCase(fetchPostsWithMedia.rejected, (state, action) => {
         state.loading = false;
@@ -222,6 +253,7 @@ export const {
   updateIsFollowByUserId,
   trimOldReels,
   resetReels,
+  resetPosts,
   incrementCommentCountByPostId,
   updateLikeByPostId,
 } = postReducer.actions;
