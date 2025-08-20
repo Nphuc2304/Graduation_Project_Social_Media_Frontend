@@ -1,4 +1,4 @@
-import React, {useEffect, useRef, useState} from 'react';
+import React, {useRef} from 'react';
 import {
   View,
   TouchableOpacity,
@@ -17,8 +17,6 @@ import CustomPopupModal, {
   CustomPopupModalRef,
 } from '../../../../components/Global/CustomPopupModal';
 import 'react-native-get-random-values';
-import {v4 as uuidv4} from 'uuid';
-import {startOutgoingCall} from '../../../../src/core/callkeep/callkeep';
 
 interface MessageHeaderProps {
   user1?: RoomUser;
@@ -46,6 +44,30 @@ const MessageHeader: React.FC<MessageHeaderProps> = ({
   const modalRef = useRef<CustomPopupModalRef>(null);
   const {socket} = useSocket();
 
+  const isNavigatingRef = useRef(false);
+
+  const goToCalling = (type: 'video' | 'voice') => {
+    if (isNavigatingRef.current) return;
+    isNavigatingRef.current = true;
+
+    navigation.navigate('CallingScreen', {
+      callType: type,
+      roomId: room?._id,
+      callee: {
+        userId: user1?._id,
+        username: user1?.username,
+        profilePic: user1?.profilePic,
+      },
+      caller: {
+        userId: userC?._id,
+        username: userC?.username,
+        profilePic: userC?.profilePic,
+      },
+    });
+
+    setTimeout(() => (isNavigatingRef.current = false), 500);
+  };
+
   const emitGlobal = (event: string, data: any) => {
     socket?.emit(event, data);
   };
@@ -55,43 +77,22 @@ const MessageHeader: React.FC<MessageHeaderProps> = ({
     if (!room?._id || !userC || !user1) return;
     Vibration.vibrate(50);
 
-    const callUUID = startOutgoingCall({
-      uuid: uuidv4(),
-      callee: user1.username ?? 'Người nhận',
-      hasVideo: true,
-      roomId: room._id,
-      selfId: userC._id,
-      selfName: userC.username ?? 'Người gọi',
-      calleeId: user1._id,
-      calleeName: user1.username ?? 'Người nhận',
-      image: user1.profilePic,
-    });
-
     emitGlobal('incomingCall', {
       callerId: userC?._id,
       callerName: userC?.username,
       callerAvatar: userC?.profilePic,
       type: 'video',
       roomId: room._id,
-      callUUID,
       accepted: false,
     });
+
+    goToCalling('video');
   };
 
   /** Gọi thoại */
   const handleVoiceCall = () => {
     if (!room?._id || !userC || !user1) return;
     Vibration.vibrate(50);
-    const callUUID = startOutgoingCall({
-      uuid: uuidv4(),
-      callee: user1.username ?? 'Người nhận',
-      hasVideo: false,
-      roomId: room._id,
-      selfId: userC._id,
-      selfName: userC.username ?? 'Người gọi',
-      calleeId: user1._id,
-      calleeName: user1.username ?? 'Người nhận',
-    });
 
     emitGlobal('incomingCall', {
       callerId: userC._id,
@@ -99,9 +100,10 @@ const MessageHeader: React.FC<MessageHeaderProps> = ({
       callerAvatar: userC.profilePic,
       type: 'voice',
       roomId: room._id,
-      callUUID,
       accepted: false,
     });
+
+    goToCalling('voice');
   };
 
   const shouldShowCallIcons =
