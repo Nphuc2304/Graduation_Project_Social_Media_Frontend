@@ -119,7 +119,7 @@ export const MessageScreen = () => {
   const roomMember2 = filteredUsers?.[1];
 
   const {showUploadModal, hideUploadModal, setProgress} = useUploadProgress();
-  const {socket, disconnectSocket} = useSocket();
+  const {socket} = useSocket();
 
   useEffect(() => {
     const checkRelation = async () => {

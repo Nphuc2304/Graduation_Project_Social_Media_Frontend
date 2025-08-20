@@ -45,39 +45,6 @@ const MessageHeader: React.FC<MessageHeaderProps> = ({
   const color = Colors[theme];
   const modalRef = useRef<CustomPopupModalRef>(null);
   const {socket} = useSocket();
-  const [incomingCall, setIncomingCall] = useState({
-    visible: false,
-    callerId: '',
-    callerName: '',
-    callerAvatar: undefined as string | undefined,
-    type: 'video' as 'video' | 'voice',
-    callUUID: '',
-    roomId: '',
-  });
-
-  useEffect(() => {
-    if (!socket) return;
-
-    const onIncomingCall = (data: any) => {
-      if (data?.callerId !== userC?._id && data?.roomId === room?._id) {
-        setIncomingCall({
-          visible: true,
-          callerId: data.callerId,
-          callerName: data.callerName,
-          callerAvatar: data.callerAvatar,
-          type: data.type,
-          callUUID: data.callUUID,
-          roomId: data.roomId,
-        });
-      }
-    };
-
-    socket.on('incomingCall', onIncomingCall);
-
-    return () => {
-      socket.off('incomingCall', onIncomingCall);
-    };
-  }, [socket, userC?._id, room?._id]);
 
   const emitGlobal = (event: string, data: any) => {
     socket?.emit(event, data);
@@ -101,9 +68,9 @@ const MessageHeader: React.FC<MessageHeaderProps> = ({
     });
 
     emitGlobal('incomingCall', {
-      callerId: userC._id,
-      callerName: userC.username,
-      callerAvatar: userC.profilePic,
+      callerId: userC?._id,
+      callerName: userC?.username,
+      callerAvatar: userC?.profilePic,
       type: 'video',
       roomId: room._id,
       callUUID,

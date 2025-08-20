@@ -17,13 +17,14 @@ import {useSocket} from '@services/SocketContext';
 export const useNotificationHandler = (onNavigate: (data: any) => void) => {
   const [modalData, setModalData] = useState<any | null>(null);
   const dispatch = useDispatch<AppDispatch>();
-  const {connectToSocket} = useSocket();
+  const {connectToSocket, joinRoom} = useSocket();
   const user = useSelector((s: RootState) => s.user.user);
 
   const handleIncomingCallPush = useCallback(
     async (data: any) => {
       await setupCallKeep();
-      connectToSocket();
+
+      joinRoom(data.roomId);
       if (user?._id) setCallKeepUserId(user._id);
 
       showIncomingCall({
@@ -31,7 +32,7 @@ export const useNotificationHandler = (onNavigate: (data: any) => void) => {
         callerName: data.userName || 'Cuộc gọi tới',
         handle: data.userId,
         hasVideo: (data.callType || 'video') === 'video',
-        roomId: data.callId || data.roomId,
+        roomId: data.roomId,
         callerId: data.userId,
         image: data.image,
       });

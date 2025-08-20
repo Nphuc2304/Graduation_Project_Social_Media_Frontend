@@ -48,13 +48,12 @@ export const SocketProvider = ({children}: {children: React.ReactNode}) => {
   const connectToSocket = () => {
     if (!user?._id) return;
 
-    // Dùng lại socket đã có hoặc đang trong quá trình kết nối
     const existing = getGlobalSocket();
     if (existing?.connected) {
       socketRef.current = existing;
       setSocket(existing);
-      setCallKeepSocket(existing); // đảm bảo CallKeep dùng đúng instance
       setCallKeepUserId(user._id);
+      setCallKeepSocket(existing);
       return;
     }
     if (isConnecting()) {
@@ -65,18 +64,15 @@ export const SocketProvider = ({children}: {children: React.ReactNode}) => {
     setConnecting(true);
     const s = io(BASE_URL, {
       transports: ['websocket'],
-      auth: {userId: user._id}, // BE đọc handshake.auth.userId
-      query: {userId: user._id}, // và cả handshake.query.userId
-      // path: '/socket.io',              // nếu BE dùng path custom thì bật
+      auth: {userId: user._id},
+      query: {userId: user._id},
     });
-
-    // Gắn vào CallKeep NGAY để wire listener sớm (không đợi 'connect')
-    setCallKeepSocket(s);
 
     s.on('connect', () => {
       console.log('✅ Socket connected!', s.id);
       setCallKeepUserId(user._id);
       setConnecting(false);
+      setCallKeepSocket(s);
     });
 
     s.on('disconnect', reason => {
@@ -88,9 +84,6 @@ export const SocketProvider = ({children}: {children: React.ReactNode}) => {
       setConnecting(false);
     });
 
-    // (tuỳ chọn) debug tất cả event về client:
-    // s.onAny((ev, ...args) => console.log('[SOCKET <-]', ev, args?.[0]));
-
     socketRef.current = s;
     setSocket(s);
     setGlobalSocket(s);
@@ -100,13 +93,13 @@ export const SocketProvider = ({children}: {children: React.ReactNode}) => {
     const s = socketRef.current ?? getGlobalSocket();
     if (!s) return;
 
-    s.removeAllListeners(); // dọn listener để tránh rò rỉ
+    setCallKeepSocket(null);
+    s.removeAllListeners();
     s.disconnect();
 
     if (socketRef.current === s) socketRef.current = null;
     if (getGlobalSocket() === s) setGlobalSocket(null);
     setSocket(null);
-    setCallKeepSocket(null);
     setConnecting(false);
     console.log('🔌 Socket manually disconnected.');
   };
