@@ -57,7 +57,7 @@ import {
   PrivacySafetyChat,
   CameraScreen,
   NewPasswordReset,
-  ChatAIBox
+  ChatAIBox,
 } from '../Screens';
 import BottomTabs from './BottomTabs';
 import ProfileComp from '../Screens/Profile';
@@ -72,6 +72,7 @@ import AllReels from '../../components/AllReels';
 import PostDetailScreen from '../../components/PostDetailScreen';
 import AllTaggedPostOfUserScreen from '../../components/AllTaggedPostOfUserScreen';
 import {CameraPreview} from '../../src/Screens/CameraPreview';
+import CallRinging from '../../src/Screens/Message/components/CallRinging';
 
 export type RootStackParamList = {
   Splash: undefined;
@@ -173,6 +174,14 @@ export type RootStackParamList = {
   CreateGroupScreen: undefined;
   HighlightCreateScreen: undefined;
   CameraPreview: {uri: string; roomId: string};
+  CallingScreen: {
+    username: string;
+    avatar?: string;
+    callType?: 'video' | 'voice';
+    onEnd?: () => void;
+    subtitle?: string;
+    backgroundImage?: string;
+  };
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -280,6 +289,10 @@ const AppNavigator = () => {
         <Stack.Screen name="PrivacySafetyChat" component={PrivacySafetyChat} />
         <Stack.Screen name="CameraPreview" component={CameraPreview} />
         <Stack.Screen name="NewPasswordReset" component={NewPasswordReset} />
+        <Stack.Screen
+          name="CallingScreen"
+          component={({route}: any) => <CallRinging {...route.params} />}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );

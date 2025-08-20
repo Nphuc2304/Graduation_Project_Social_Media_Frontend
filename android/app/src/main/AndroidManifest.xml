@@ -105,11 +105,6 @@
         </intent-filter>
       </service>
 
-      <service
-        android:name=".keepalive.KeepAliveService"
-        android:exported="false"
-        android:foregroundServiceType="dataSync" />
-
       <receiver android:exported="true" android:enabled="true" android:name="io.invertase.firebase.messaging.ReactNativeFirebaseMessagingReceiver">
           <intent-filter>
               <action android:name="com.google.firebase.MESSAGING_EVENT" />

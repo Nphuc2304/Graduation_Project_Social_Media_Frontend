@@ -8,18 +8,14 @@ import {
 } from '../components/Global/AlertModal';
 import NotificationModal from '@services/notification/NotificationModal';
 import {createNotificationChannel} from '@services/notification/notification';
-import {useNotificationHandler} from '@services/notification/useNotification';
+import {useNotificationHandler} from '@services/notification/useNotification'; // <- đảm bảo file hook đã được cập nhật như mình gửi
 import {navigationRef} from './NavigationService';
 import {Linking, PermissionsAndroid, Platform} from 'react-native';
 import {navigateFromUrl} from './core/deeplinkHandler';
-import {
-  setCallKeepUserId,
-  setupCallKeep,
-  showIncomingCall,
-} from './core/callkeep/callkeep';
 import {useSocket} from '@services/SocketContext';
 import {useSelector} from 'react-redux';
 import {RootState} from '@services/store';
+import CallInvitePopup from '@services/notification/CallInvitePopup';
 
 async function requestCallPermissions() {
   if (Platform.OS !== 'android') return;
@@ -45,6 +41,7 @@ async function requestCallPermissions() {
 const AppContent = () => {
   const user = useSelector((state: RootState) => state.user.user);
   const {connectToSocket} = useSocket();
+
   useEffect(() => {
     createNotificationChannel();
   }, []);
@@ -53,7 +50,13 @@ const AppContent = () => {
     connectToSocket();
   }, []);
 
-  const {modalData, clearModal} = useNotificationHandler(data => {
+  const {
+    modalData,
+    clearModal,
+    incomingCall,
+    acceptIncomingCall,
+    declineIncomingCall,
+  } = useNotificationHandler(data => {
     if (!navigationRef.isReady()) return;
 
     switch (data?.type) {
@@ -65,6 +68,7 @@ const AppContent = () => {
           });
         }
         break;
+
       case 'like':
       case 'post':
         if (data?.postId) {
@@ -73,31 +77,36 @@ const AppContent = () => {
           });
         }
         break;
+
       case 'follow':
         navigationRef.navigate('ProfileComp', {
           userID: data?.userId,
         });
         break;
+
       case 'incoming_call':
-      case 'call': {
-        if (user?._id) setCallKeepUserId(user._id);
-        showIncomingCall({
-          uuid: modalData.data.callUuid,
-          callerName: modalData.data.userName || 'Cuộc gọi tới',
-          handle: modalData.data.userId,
-          hasVideo: (modalData.data.callType || 'video') === 'video',
-          roomId: modalData.data.callId || modalData.data.roomId,
-          callerId: modalData.data.userId,
-          image: modalData.data.image,
+        // Không điều hướng trực tiếp ở đây — hook đã set incomingCall để hiển thị popup
+        break;
+
+      case 'call_accepted':
+        // Khi user bấm Chấp nhận trong popup → hook gọi onNavigate với case này
+        navigationRef.navigate('ZegoCallScreen', {
+          callID: data.roomId,
+          userID: user?._id,
+          userName: user?.username,
+          image: user?.profilePic,
+          isCaller: false,
+          callType: data.callType || 'video',
         });
         break;
-      }
+
       case 'message':
         navigationRef.navigate('MessageScreen', {
           room: data?.roomId,
           isWaiting: data?.isWaiting,
         });
         break;
+
       default:
         break;
     }
@@ -125,7 +134,6 @@ const AppContent = () => {
   useEffect(() => {
     (async () => {
       await requestCallPermissions();
-      await setupCallKeep();
     })();
   }, []);
 
@@ -133,6 +141,8 @@ const AppContent = () => {
     <>
       <AppNavigator />
       <Toast />
+
+      {/* Notification in-app chung cho các loại khác */}
       {modalData && (
         <NotificationModal
           visible={true}
@@ -164,23 +174,17 @@ const AppContent = () => {
                     userID: modalData.data?.userId,
                   });
                   break;
-                case 'incoming_call':
-                case 'call':
-                  navigationRef.navigate('ZegoCallScreen', {
-                    callID: modalData.data.callId || modalData.data.roomId,
-                    userID: modalData.data.userId,
-                    userName: modalData.data.userName,
-                    image: modalData.data.image,
-                    isCaller: false,
-                    callType: modalData.data.callType || 'video',
-                  });
-                  break;
                 case 'message':
                   navigationRef.navigate('MessageScreen', {
-                    room: modalData.data.roomId,
+                    room: modalData.data?.roomId,
                     isWaiting: modalData.data?.isWaiting,
                   });
                   break;
+
+                // LƯU Ý: KHÔNG điều hướng thẳng với 'incoming_call' tại modal này nữa.
+                // Vì ta đã có CallInvitePopup hiển thị riêng để Accept/Decline.
+                case 'incoming_call':
+                case 'call':
                 default:
                   break;
               }
@@ -188,6 +192,18 @@ const AppContent = () => {
           }}
         />
       )}
+
+      {/* Popup cuộc gọi đến: chấp nhận / từ chối */}
+      <CallInvitePopup
+        visible={Boolean(incomingCall?.visible)}
+        callerName={incomingCall?.callerName}
+        callerAvatar={incomingCall?.callerAvatar}
+        callType={incomingCall?.callType}
+        onAccept={acceptIncomingCall}
+        onDecline={declineIncomingCall}
+        onRequestClose={declineIncomingCall}
+      />
+
       <GlobalAlert ref={handleAlertRef} />
     </>
   );
