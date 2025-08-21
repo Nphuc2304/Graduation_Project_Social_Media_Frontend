@@ -1,4 +1,4 @@
-import React, {useEffect, useRef} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {
   View,
   Text,
@@ -32,6 +32,7 @@ type CallRingingProps = {
   callUuid?: string;
   subtitle?: string;
   backgroundImage?: string;
+  navigation?: any;
 
   /** Đóng UI (caller hủy hoặc bị bên kia kết thúc) */
   onClose?: () => void;
@@ -56,6 +57,7 @@ const CallRinging: React.FC<CallRingingProps> = ({
   const insets = useSafeAreaInsets();
   const {socket} = useSocket();
   const user = useSelector((s: RootState) => s.user.user);
+  const [isEnd, setIsEnd] = useState(false);
 
   // ===== Animation ripple =====
   const scale1 = useSharedValue(1);
@@ -105,6 +107,7 @@ const CallRinging: React.FC<CallRingingProps> = ({
 
   // ===== Handle end call (caller tự hủy) =====
   const handleEnd = () => {
+    setIsEnd(true);
     if (roomId && user?._id) {
       socket?.emit('callEnded', {
         roomId,
@@ -136,6 +139,7 @@ const CallRinging: React.FC<CallRingingProps> = ({
     const onCallEnded = (payload: {roomId: string; missed?: boolean}) => {
       if (payload?.roomId !== roomId) return;
       if (closedRef.current) return;
+      if (isEnd) return;
       closedRef.current = true;
       onClose?.();
     };
@@ -164,6 +168,7 @@ const CallRinging: React.FC<CallRingingProps> = ({
     return () => {
       socket.off('callAccepted', onCallAccepted);
       socket.off('callEnded', onCallEnded);
+      setIsEnd(false);
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
@@ -188,10 +193,7 @@ const CallRinging: React.FC<CallRingingProps> = ({
           <View style={styles.avatarWrap}>
             <Animated.View style={[styles.pulse, pulse1]} />
             <Animated.View style={[styles.pulse, pulse2]} />
-            <Image
-              source={avatar ? {uri: avatar} : require('./fallback-avatar.png')}
-              style={styles.avatar}
-            />
+            <Image source={{uri: avatar}} style={styles.avatar} />
           </View>
 
           <Text style={styles.username} numberOfLines={1}>
