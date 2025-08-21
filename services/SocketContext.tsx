@@ -3,10 +3,6 @@ import {io, Socket} from 'socket.io-client';
 import {BASE_URL} from '../services/api';
 import {useSelector} from 'react-redux';
 import {RootState} from '../services/store';
-import {
-  setCallKeepSocket,
-  setCallKeepUserId,
-} from '../src/core/callkeep/callkeep';
 
 interface SocketContextType {
   socket: Socket | null;
@@ -52,12 +48,9 @@ export const SocketProvider = ({children}: {children: React.ReactNode}) => {
     if (existing?.connected) {
       socketRef.current = existing;
       setSocket(existing);
-      setCallKeepUserId(user._id);
-      setCallKeepSocket(existing);
       return;
     }
     if (isConnecting()) {
-      // đã có nơi khác gọi connect rồi -> không tạo thêm
       return;
     }
 
@@ -70,9 +63,7 @@ export const SocketProvider = ({children}: {children: React.ReactNode}) => {
 
     s.on('connect', () => {
       console.log('✅ Socket connected!', s.id);
-      setCallKeepUserId(user._id);
       setConnecting(false);
-      setCallKeepSocket(s);
     });
 
     s.on('disconnect', reason => {
@@ -93,7 +84,6 @@ export const SocketProvider = ({children}: {children: React.ReactNode}) => {
     const s = socketRef.current ?? getGlobalSocket();
     if (!s) return;
 
-    setCallKeepSocket(null);
     s.removeAllListeners();
     s.disconnect();
 
