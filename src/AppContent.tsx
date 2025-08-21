@@ -40,7 +40,7 @@ async function requestCallPermissions() {
 
 const AppContent = () => {
   const user = useSelector((state: RootState) => state.user.user);
-  const {connectToSocket} = useSocket();
+  const {connectToSocket, socket} = useSocket();
 
   useEffect(() => {
     createNotificationChannel();
@@ -90,6 +90,11 @@ const AppContent = () => {
 
       case 'call_accepted':
         // Khi user bấm Chấp nhận trong popup → hook gọi onNavigate với case này
+        socket?.emit('acceptCall', {
+          roomId: data.roomId,
+          userId: user?._id,
+          callType: data.callType || 'video',
+        });
         navigationRef.navigate('ZegoCallScreen', {
           callID: data.roomId,
           userID: user?._id,

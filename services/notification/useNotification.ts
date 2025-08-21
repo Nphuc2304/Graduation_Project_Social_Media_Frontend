@@ -158,6 +158,12 @@ export const useNotificationHandler = (onNavigate: (data: any) => void) => {
       unsubscribeOpenedApp();
     };
   }, [handleMessage, handleNavigate]);
+  
+  useEffect(() => {
+    socket?.on('callEnded', payload => {
+      setIncomingCall(null);
+    });
+  }, [socket]);
 
   return {
     // notification in-app mặc định

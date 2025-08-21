@@ -38,14 +38,14 @@ export const ItemHomeHeader: React.FC<ItemHomeHeaderProps> = ({
 
   return (
     <View style={ItemHomeStyles.headerItem}>
-      <View style={ItemHomeStyles.rowContainer}>
+      <View style={[ItemHomeStyles.rowContainer, {flex: 1}]}>
         <TouchableOpacity style={ItemHomeStyles.blockImg} onPress={onUserPress}>
           <Image
             style={ItemHomeStyles.imgUser}
             source={{uri: user.profilePic}}
           />
         </TouchableOpacity>
-        <View>
+        <View style={{flex: 1, paddingRight: 15}}>
           <Text
             numberOfLines={1}
             style={[ItemHomeStyles.textNormal, {color: textColor}]}>
@@ -54,7 +54,7 @@ export const ItemHomeHeader: React.FC<ItemHomeHeaderProps> = ({
           {musicInfo?.song ? (
             <Text
               numberOfLines={1}
-              style={[ItemHomeStyles.text, {color: textColor, width: '50%'}]}>
+              style={[ItemHomeStyles.text, {color: textColor}]}>
               {musicInfo.song}
             </Text>
           ) : null}

@@ -17,6 +17,9 @@ import CustomPopupModal, {
   CustomPopupModalRef,
 } from '../../../../components/Global/CustomPopupModal';
 import 'react-native-get-random-values';
+import {useSelector} from 'react-redux';
+import {RootState} from '@services/store';
+import {StackActions} from '@react-navigation/native';
 
 interface MessageHeaderProps {
   user1?: RoomUser;
@@ -43,6 +46,7 @@ const MessageHeader: React.FC<MessageHeaderProps> = ({
   const color = Colors[theme];
   const modalRef = useRef<CustomPopupModalRef>(null);
   const {socket} = useSocket();
+  const user = useSelector((state: RootState) => state.user.user);
 
   const isNavigatingRef = useRef(false);
 
@@ -62,6 +66,19 @@ const MessageHeader: React.FC<MessageHeaderProps> = ({
         userId: userC?._id,
         username: userC?.username,
         profilePic: userC?.profilePic,
+      },
+      onClose: () => {
+        navigation.dispatch(StackActions.pop(1));
+      },
+      onAccepted: ({roomId, callType}: {roomId: string; callType: string}) => {
+        navigation.navigate('ZegoCallScreen', {
+          callID: roomId,
+          userID: user?._id,
+          userName: user?.username,
+          image: user?.profilePic,
+          isCaller: true,
+          callType: callType || 'video',
+        });
       },
     });
 
