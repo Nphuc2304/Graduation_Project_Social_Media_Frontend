@@ -25,14 +25,22 @@ import {useSelector} from 'react-redux';
 import {RootState} from '@services/store';
 
 type CallRingingProps = {
-  username: string;
-  avatar?: string;
   callType?: 'video' | 'voice';
   roomId: string;
   callUuid?: string;
   subtitle?: string;
   backgroundImage?: string;
   navigation?: any;
+  callee: {
+    userId: string;
+    username: string;
+    profilePic: string;
+  };
+  caller: {
+    userId: string;
+    username: string;
+    profilePic: string;
+  };
 
   /** Đóng UI (caller hủy hoặc bị bên kia kết thúc) */
   onClose?: () => void;
@@ -43,12 +51,10 @@ type CallRingingProps = {
 };
 
 const CallRinging: React.FC<CallRingingProps> = ({
-  username,
-  avatar,
   callType = 'video',
   roomId,
-  callUuid,
   onClose,
+  callee,
   onAccepted,
   subtitle = 'Đang gọi…',
   backgroundImage,
@@ -57,7 +63,7 @@ const CallRinging: React.FC<CallRingingProps> = ({
   const insets = useSafeAreaInsets();
   const {socket} = useSocket();
   const user = useSelector((s: RootState) => s.user.user);
-  const [isEnd, setIsEnd] = useState(false);
+  const closedRef = useRef(false);
 
   // ===== Animation ripple =====
   const scale1 = useSharedValue(1);
@@ -107,7 +113,6 @@ const CallRinging: React.FC<CallRingingProps> = ({
 
   // ===== Handle end call (caller tự hủy) =====
   const handleEnd = () => {
-    setIsEnd(true);
     if (roomId && user?._id) {
       socket?.emit('callEnded', {
         roomId,
@@ -116,12 +121,13 @@ const CallRinging: React.FC<CallRingingProps> = ({
         duration: 0,
       });
     }
+    if(closedRef.current) return;
+    closedRef.current = true;
     onClose?.(); // đóng UI
   };
 
   // ===== Listen sự kiện từ BE: callAccepted / callEnded + auto-timeout =====
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const closedRef = useRef(false); // tránh gọi onClose nhiều lần
 
   useEffect(() => {
     if (!socket) return;
@@ -139,7 +145,6 @@ const CallRinging: React.FC<CallRingingProps> = ({
     const onCallEnded = (payload: {roomId: string; missed?: boolean}) => {
       if (payload?.roomId !== roomId) return;
       if (closedRef.current) return;
-      if (isEnd) return;
       closedRef.current = true;
       onClose?.();
     };
@@ -168,7 +173,6 @@ const CallRinging: React.FC<CallRingingProps> = ({
     return () => {
       socket.off('callAccepted', onCallAccepted);
       socket.off('callEnded', onCallEnded);
-      setIsEnd(false);
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
@@ -193,11 +197,11 @@ const CallRinging: React.FC<CallRingingProps> = ({
           <View style={styles.avatarWrap}>
             <Animated.View style={[styles.pulse, pulse1]} />
             <Animated.View style={[styles.pulse, pulse2]} />
-            <Image source={{uri: avatar}} style={styles.avatar} />
+            <Image source={{uri: callee.profilePic}} style={styles.avatar} />
           </View>
 
           <Text style={styles.username} numberOfLines={1}>
-            {username || 'Không xác định'}
+            {callee.username || 'Không xác định'}
           </Text>
 
           <View style={styles.subtitleWrap}>
