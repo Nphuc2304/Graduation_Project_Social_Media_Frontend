@@ -175,6 +175,7 @@ export const MessageScreen = () => {
       setChat(prev =>
         prev.map(msg => (msg._id === messageId ? {...msg, reactions} : msg)),
       );
+      setHighlightedMessageId(null);
     };
 
     const onMessageDeleted = ({messageId}: {messageId: string}) => {
@@ -189,6 +190,7 @@ export const MessageScreen = () => {
             : msg,
         ),
       );
+      setHighlightedMessageId(null);
     };
 
     const onThemeUpdated = ({
@@ -201,6 +203,7 @@ export const MessageScreen = () => {
       if (updatedRoomId === roomId) {
         setOriginalRoom(prev => (prev ? {...prev, theme} : prev));
       }
+      setHighlightedMessageId(null);
     };
 
     const handleTyping = (item: ItemTyping) => {
@@ -252,7 +255,7 @@ export const MessageScreen = () => {
 
   // Handle highlighting from search results
   useEffect(() => {
-    if (highlightMessageId && chat.length > 0) {
+    if (highlightMessageId) {
       setHighlightedMessageId(highlightMessageId);
 
       // Scroll to the highlighted message if scrollToIndex is provided
@@ -271,7 +274,7 @@ export const MessageScreen = () => {
         setHighlightedMessageId(null);
       }, 3000);
     }
-  }, [highlightMessageId, scrollToIndex, chat]);
+  }, [highlightMessageId, scrollToIndex]);
 
   const sendMessage = useCallback(() => {
     const trimmedMessage = message.trim();
@@ -282,7 +285,6 @@ export const MessageScreen = () => {
         senderId: userC?._id,
       });
       setMessage('');
-      // Clear highlight when user sends a message
       setHighlightedMessageId(null);
     }
   }, [message, socket, roomId, userC?._id]);
