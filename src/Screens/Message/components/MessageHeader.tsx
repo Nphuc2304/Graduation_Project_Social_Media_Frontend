@@ -71,6 +71,7 @@ const MessageHeader: React.FC<MessageHeaderProps> = ({
         navigation.dispatch(StackActions.pop(1));
       },
       onAccepted: ({roomId, callType}: {roomId: string; callType: string}) => {
+        navigation.dispatch(StackActions.pop(1));
         navigation.navigate('ZegoCallScreen', {
           callID: roomId,
           userID: user?._id,
