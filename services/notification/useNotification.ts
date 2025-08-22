@@ -163,6 +163,11 @@ export const useNotificationHandler = (onNavigate: (data: any) => void) => {
     socket?.on('callEnded', payload => {
       setIncomingCall(null);
     });
+    return () => {
+      socket?.off('callEnded', payload => {
+        setIncomingCall(null);
+      })
+    };
   }, [socket]);
 
   return {
