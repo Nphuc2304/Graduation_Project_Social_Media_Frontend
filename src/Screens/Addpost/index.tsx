@@ -122,7 +122,7 @@ export const AddPost = () => {
       setIsInitialLoading(true);
       
       const result = await CameraRoll.getPhotos({
-        first: 500,
+        first: 100,
         assetType: getAssetType(filter),
         groupTypes: 'All',
         include: ['filename', 'fileSize', 'location', 'imageSize', 'playableDuration'],
@@ -156,7 +156,7 @@ export const AddPost = () => {
   const fetchRemainingMediaInBackground = async (cursor: string, currentMedia: PhotoIdentifier[]) => {
     try {
       const result = await CameraRoll.getPhotos({
-        first: 500,
+        first: 100,
         assetType: getAssetType(filter),
         after: cursor,
         groupTypes: 'All',

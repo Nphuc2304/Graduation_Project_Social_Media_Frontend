@@ -38,16 +38,40 @@ export const postSecondList: Omit<ConfigOption, 'onPress'>[] = [
 ];
 
 export const reportChoices: IntentionOptionConfig[] = [
-  {id: 'bullying', label: 'Bắt nạt hoặc liên hệ theo cách không mong muốn'},
   {
-    id: 'selfHarm',
+    id: 'HARASSMENT_AND_BULLYING', 
+    label: 'Bắt nạt hoặc liên hệ theo cách không mong muốn'
+  },
+  {
+    id: 'SELF_HARM',
     label: 'Tự tử, tự gây thương tích hoặc chứng rối loạn ăn uống',
   },
-  {id: 'violence', label: 'Bạo lực, thù ghét hoặc bóc lột'},
-  {id: 'restricted', label: 'Bán hoặc quảng cáo mặt hàng bị hạn chế'},
-  {id: 'nudity', label: 'Ảnh khỏa thân hoặc hoạt động tình dục'},
-  {id: 'spam', label: 'Lừa đảo, gian lận hoặc spam'},
-  {id: 'false', label: 'Thông tin sai sự thật'},
-  {id: 'copyright', label: 'Quyền sở hữu trí tuệ'},
-  {id: 'other', label: 'Khác'},
+  {
+    id: 'THREATS_AND_VIOLENCE', 
+    label: 'Bạo lực, thù ghét hoặc bóc lột'
+  },
+  {
+    id: 'SCAMS_AND_FRAUD', 
+    label: 'Bán hoặc quảng cáo mặt hàng bị hạn chế'
+  },
+  {
+    id: 'GRAPHIC_CONTENT', 
+    label: 'Ảnh khỏa thân hoặc hoạt động tình dục'
+  },
+  {
+    id: 'SCAMS_AND_FRAUD', 
+    label: 'Lừa đảo, gian lận hoặc spam'
+  },
+  {
+    id: 'HATE_SPEECH', 
+    label: 'Thông tin sai sự thật'
+  },
+  {
+    id: 'SENSITIVE_PERSONAL_INFO', 
+    label: 'Quyền sở hữu trí tuệ'
+  },
+  {
+    id: 'OTHER', 
+    label: 'Khác'
+  },
 ];

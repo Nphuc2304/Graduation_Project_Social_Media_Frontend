@@ -79,7 +79,7 @@ const PostStory = () => {
         }
 
         const result = await CameraRoll.getPhotos({
-          first: 300,
+          first: 100,
           assetType: 'All',
           include: ['playableDuration', 'filename'],
           after: loadMore ? lastCursor || undefined : undefined,

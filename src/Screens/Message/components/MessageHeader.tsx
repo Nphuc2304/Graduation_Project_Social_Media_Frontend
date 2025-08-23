@@ -215,37 +215,8 @@ const MessageHeader: React.FC<MessageHeaderProps> = ({
               </TouchableOpacity>
             </>
           )}
-          <TouchableOpacity onPress={() => modalRef.current?.open()}>
-            <AlertCircle size={20} color={color.text} />
-          </TouchableOpacity>
         </View>
       </View>
-
-      <CustomPopupModal
-        ref={modalRef}
-        showCancelButton
-        cancelText="Huỷ"
-        cancelTextColor="#007AFF"
-        onCancel={() => modalRef.current?.close()}>
-        <TouchableOpacity
-          style={styles.destructiveButton}
-          onPress={() => {
-            modalRef.current?.close();
-          }}>
-          <Text style={[styles.destructiveText, {color: '#007AFF'}]}>
-            Ẩn đoạn chat
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.destructiveButton}
-          onPress={() => {
-            modalRef.current?.close();
-          }}>
-          <Text style={[styles.destructiveText, {color: '#007AFF'}]}>
-            Rời đoạn chat
-          </Text>
-        </TouchableOpacity>
-      </CustomPopupModal>
     </>
   );
 };
