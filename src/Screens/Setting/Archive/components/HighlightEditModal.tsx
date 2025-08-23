@@ -170,7 +170,7 @@ const HighlightEditModal = ({
             <View style={[{flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, styles.input]}>
 
             <TextInput
-             style={{flex: 1}}
+             style={{flex: 1, color: color.text}}
               placeholder="Nhập tên highlight"
               placeholderTextColor={'gray'}
               value={highlightName}
