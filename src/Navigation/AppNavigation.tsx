@@ -74,6 +74,9 @@ import AllTaggedPostOfUserScreen from '../../components/AllTaggedPostOfUserScree
 import {CameraPreview} from '../../src/Screens/CameraPreview';
 import CallRinging from '../../src/Screens/Message/components/CallRinging';
 
+// Wrapper component để truyền props từ route params
+const CallRingingWrapper = ({route}: any) => <CallRinging {...route.params} />;
+
 export type RootStackParamList = {
   Splash: undefined;
   ChatAIBox: undefined;
@@ -291,7 +294,7 @@ const AppNavigator = () => {
         <Stack.Screen name="NewPasswordReset" component={NewPasswordReset} />
         <Stack.Screen
           name="CallingScreen"
-          component={({route}: any) => <CallRinging {...route.params} />}
+          component={CallRingingWrapper}
         />
       </Stack.Navigator>
     </NavigationContainer>

@@ -138,6 +138,11 @@ export const useStoryPrefetch = () => {
     });
   }, []);
 
+  // ✅ Clear all cache when stories are updated
+  const clearAllCache = useCallback(() => {
+    cache.current = {};
+  }, []);
+
   // ✅ Add cache stats for debugging
   const getCacheStats = useCallback(() => {
     const entries = Object.values(cache.current);
@@ -176,6 +181,7 @@ export const useStoryPrefetch = () => {
     getCachedStoryData,
     clearCache,
     clearExpiredCache,
+    clearAllCache,
     getCacheStats,
     preloadAdjacentStories,
   };

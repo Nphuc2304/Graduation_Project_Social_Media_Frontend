@@ -23,6 +23,7 @@ interface StoryState {
   highlightStories: Story[];
   loading: boolean;
   error: string | null;
+  lastRefresh: number;
 }
 
 const initialState: StoryState = {
@@ -32,6 +33,7 @@ const initialState: StoryState = {
   highlightStories: [],
   loading: false,
   error: null,
+  lastRefresh: 0,
 };
 
 const storySlice = createSlice({
@@ -45,6 +47,8 @@ const storySlice = createSlice({
       // Trigger re-render by updating a timestamp
       state.loading = false;
       state.error = null;
+      // Add a timestamp to force re-render
+      state.lastRefresh = Date.now();
     },
   },
   extraReducers: builder => {
