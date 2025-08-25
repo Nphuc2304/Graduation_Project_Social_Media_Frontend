@@ -97,7 +97,7 @@ export const Home = forwardRef(({route}: HomeProps, ref) => {
     useStoryPrefetch();
 
   const reloadAllData = useCallback(() => {
-    console.log('🔄 Reloading all data...'); // Debug log
+    
     dispatch(fetchPostsWithMedia({page: 1}));
     dispatch(fetchFollowingStories({page: 1}));
     dispatch(forceRefreshStories()); // Force re-render
