@@ -11,6 +11,7 @@ export const selectHomeData = createSelector(
     (state: RootState) => state.stories.followingUsers,
     (state: RootState) => state.stories.myStories,
     (state: RootState) => state.user.user,
+    (state: RootState) => state.stories.lastRefresh,
   ],
   (
     posts,
@@ -21,6 +22,7 @@ export const selectHomeData = createSelector(
     followingUsers,
     myStories,
     user,
+    lastRefresh,
   ) => ({
     posts,
     loading,
@@ -30,6 +32,7 @@ export const selectHomeData = createSelector(
     followingUsers,
     myStories,
     user,
+    lastRefresh,
   }),
 );
 

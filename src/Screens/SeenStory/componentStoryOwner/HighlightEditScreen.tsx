@@ -255,16 +255,21 @@ const HighlightEditScreen = () => {
           <Text style={[styles.sectionTitle, {color: color.text}]}>
             Tên highlight
           </Text>
+          <View style={[styles.nameInput,{borderColor: color.border}]}>
           <TextInput
-            style={[
-              styles.nameInput,
-              {color: color.text, borderColor: color.border},
+            style={[      
+              {color: color.text, flex: 1},
             ]}
             placeholder="Nhập tên highlight"
             placeholderTextColor={color.textSecondary}
             value={highlightName}
             onChangeText={setHighlightName}
+            maxLength={10}
           />
+          <Text style={ {color: color.textSecondary}}>
+            {highlightName.length}/10
+          </Text>
+          </View>
         </View>
 
         {/* Stories Section */}
@@ -378,10 +383,13 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
   nameInput: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 12,
-    paddingVertical: 12,
+ 
     fontSize: 16,
   },
   storiesSection: {

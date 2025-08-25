@@ -72,6 +72,7 @@ export const Home = forwardRef(({route}: HomeProps, ref) => {
     followingUsers,
     myStories,
     user,
+    lastRefresh,
   } = useSelector(selectHomeData);
   const sheetRef = useRef<BottomSheetCommentRef>(null);
   const [currentVisible, setCurrentVisible] = useState<string | null>(null);
@@ -92,33 +93,35 @@ export const Home = forwardRef(({route}: HomeProps, ref) => {
   const [isLoadingMoreStories, setIsLoadingMoreStories] = useState(false);
 
   // // ✅ Use prefetch hook
-  const {prefetchStoryData, getCachedStoryData, clearExpiredCache} =
+  const {prefetchStoryData, getCachedStoryData, clearExpiredCache, clearAllCache} =
     useStoryPrefetch();
 
   const reloadAllData = useCallback(() => {
+    
     dispatch(fetchPostsWithMedia({page: 1}));
     dispatch(fetchFollowingStories({page: 1}));
+    dispatch(forceRefreshStories()); // Force re-render
     clearExpiredSeenStories();
-    clearExpiredCache();
+    clearAllCache(); // Clear all cache to ensure fresh data
     setHasCalledLoadMore(false);
     setVisibleStoryCount(5);
-  }, [dispatch, clearExpiredCache]);
+  }, [dispatch, clearAllCache]);
 
   // // ✅ Immediate refresh when myStories changes (story created/deleted)
   useEffect(() => {
     if (myStories.length > 0) {
       dispatch(forceRefreshStories()); // Force component re-render
       dispatch(fetchFollowingStories({page: 1})); // Fetch fresh data
-      clearExpiredCache(); // Clear prefetch cache to ensure fresh data
+      clearAllCache(); // Clear all cache to ensure fresh data
     }
-  }, [myStories.length, dispatch, clearExpiredCache]);
+  }, [myStories.length, dispatch, clearAllCache]);
 
   // // ✅ Listen for navigation params to trigger immediate refresh
   useEffect(() => {
     if (route?.params?.shouldRefresh || route?.params?.timestamp) {
       dispatch(forceRefreshStories());
       dispatch(fetchFollowingStories({page: 1}));
-      clearExpiredCache();
+      clearAllCache(); // Clear all cache to ensure fresh data
 
       // Clear the params to prevent infinite refresh
       if (navigation.setParams) {
@@ -130,7 +133,7 @@ export const Home = forwardRef(({route}: HomeProps, ref) => {
     route?.params?.timestamp,
     dispatch,
     navigation,
-    clearExpiredCache,
+    clearAllCache,
   ]);
 
   // // ✅ Force refresh stories when user comes back to Home after creating/deleting story
@@ -145,6 +148,16 @@ export const Home = forwardRef(({route}: HomeProps, ref) => {
     }
   }, [isFocused, dispatch]);
 
+  // // ✅ Force refresh stories when lastRefresh timestamp changes (manual refresh or story updates)
+  useEffect(() => {
+    if (lastRefresh > 0) {
+      // Clear cache and refresh stories when manual refresh is triggered
+      clearAllCache(); // Clear all cache to ensure fresh data
+      // Reset visible story count to ensure all stories are shown
+      setVisibleStoryCount(5);
+    }
+  }, [lastRefresh, clearAllCache]);
+
   useImperativeHandle(ref, () => ({
     reload: reloadAllData,
   }));
@@ -153,10 +166,10 @@ export const Home = forwardRef(({route}: HomeProps, ref) => {
     dispatch(fetchPostsWithMedia({page: 1}));
     dispatch(fetchFollowingStories({page: 1}));
     clearExpiredSeenStories();
-    clearExpiredCache && clearExpiredCache();
+    clearAllCache && clearAllCache(); // Clear all cache to ensure fresh data
     setHasCalledLoadMore(false);
     setVisibleStoryCount(5);
-  }, [dispatch]);
+  }, [dispatch, clearAllCache]);
 
   // // ✅ Process and sort stories data with 24-hour filtering
   const processedStories = React.useMemo(() => {
@@ -327,11 +340,12 @@ export const Home = forwardRef(({route}: HomeProps, ref) => {
     if (isFocused) {
       const timeoutId = setTimeout(() => {
         dispatch(fetchFollowingStories({page: 1}));
+        clearAllCache(); // Clear all cache to ensure fresh data
       }, 500);
 
       return () => clearTimeout(timeoutId);
     }
-  }, [isFocused, dispatch]);
+  }, [isFocused, dispatch, clearAllCache]);
 
   // // ✅ Force refresh seenMap when storyDetails change (when stories are marked as seen)
   useEffect(() => {
@@ -517,7 +531,7 @@ export const Home = forwardRef(({route}: HomeProps, ref) => {
             icon={require('../../../assets/icon/logo_row.png')}
             iconQR={true}
             iconNotify={true}
-            iconMessage={true}
+            iconMessage={true}           
             navigation={navigation}
           />
         </Animated.View>
@@ -546,7 +560,7 @@ export const Home = forwardRef(({route}: HomeProps, ref) => {
           icon={require('../../../assets/icon/logo_row.png')}
           iconQR={true}
           iconNotify={true}
-          iconMessage={true}
+          iconMessage={true}               
           navigation={navigation}
         />
       </Animated.View>
